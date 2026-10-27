@@ -21,6 +21,6 @@ public class WardWallTorchBlock extends WallTorchBlock implements EntityBlock {
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new WardSourceBlockEntity(ModBlocks.WARD_SOURCE_BE.get(), pos, state);
+        return new WardSourceBlockEntity(pos, state);
     }
 }
