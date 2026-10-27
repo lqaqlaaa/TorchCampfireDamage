@@ -44,9 +44,11 @@ public class DamageEventHandler {
 
     /** 配置是否可用（避免未加载时异常导致整个 handler 失效） */
     private static volatile boolean configReady = false;
+    /** 诊断日志只打印一次 */
+    private static boolean DEBUG_PRINTED = false;
 
     @SubscribeEvent
-    public static void onServerStarted(ServerStartedEvent event) {
+    public void onServerStarted(ServerStartedEvent event) {
         // 服务端启动完成时配置一定已加载
         configReady = true;
         System.out.println("[TorchCampfireDamage] Mod loaded, config ready.");
@@ -110,7 +112,7 @@ public class DamageEventHandler {
     /* ================= 主循环 ================= */
 
     @SubscribeEvent
-    public static void onLevelTick(LevelTickEvent.Post event) {
+    public void onLevelTick(LevelTickEvent.Post event) {
         Level level = event.getLevel();
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
@@ -138,6 +140,14 @@ public class DamageEventHandler {
         double damageAmount = safeGet(ModConfig.DAMAGE_AMOUNT::get, 2.0);
         int interval = Math.max(1, safeGet(ModConfig.DAMAGE_INTERVAL::get, 20));
         int searchBlocks = (chunkRadius + 1) * CHUNK_SIZE;
+
+        // 首次诊断日志（只打印一次）
+        if (!DEBUG_PRINTED) {
+            DEBUG_PRINTED = true;
+            System.out.println("[TorchCampfireDamage] DEBUG tick running: chunkRadius=" + chunkRadius
+                    + " damage=" + damageAmount + " interval=" + interval
+                    + " players=" + level.players().size());
+        }
 
         Map<BlockPos, Long> damageTimes = lastDamageTimes.computeIfAbsent(level, k -> new HashMap<>());
         Map<BlockPos, UUID> owners = positionOwners.computeIfAbsent(level, k -> new HashMap<>());
@@ -282,7 +292,7 @@ public class DamageEventHandler {
     /* ================= 掉落物 ================= */
 
     @SubscribeEvent
-    public static void onLivingDrops(LivingDropsEvent event) {
+    public void onLivingDrops(LivingDropsEvent event) {
         LivingEntity entity = event.getEntity();
         Level level = entity.level();
         if (level.isClientSide()) return;
@@ -300,7 +310,7 @@ public class DamageEventHandler {
     /* ================= 经验 ================= */
 
     @SubscribeEvent
-    public static void onExperienceDrop(LivingExperienceDropEvent event) {
+    public void onExperienceDrop(LivingExperienceDropEvent event) {
         LivingEntity entity = event.getEntity();
         Level level = entity.level();
         if (level.isClientSide()) return;
