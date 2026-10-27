@@ -14,18 +14,19 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 客户端 -> 服务端：保存守卫方块参数。
- * 手动实现 codec（字段较多，超出 StreamCodec.composite 的 8 组上限）。
  */
 public record UpdateWardPayload(
         BlockPos pos,
-        int chunkRadius,
+        boolean enabled,
+        boolean chunkMode,
+        int range,
         double damage,
         int interval,
-        boolean announce,
         boolean glowing,
         boolean slow,
-        int slowAmplifier,
-        boolean enabled
+        boolean announce,
+        boolean teleportDrops,
+        boolean teleportXp
 ) implements CustomPacketPayload {
 
     public static final ResourceLocation ID =
@@ -39,13 +40,15 @@ public record UpdateWardPayload(
                 public UpdateWardPayload decode(RegistryFriendlyByteBuf buf) {
                     return new UpdateWardPayload(
                             buf.readBlockPos(),
+                            buf.readBoolean(),
+                            buf.readBoolean(),
                             buf.readVarInt(),
                             buf.readDouble(),
                             buf.readVarInt(),
                             buf.readBoolean(),
                             buf.readBoolean(),
                             buf.readBoolean(),
-                            buf.readVarInt(),
+                            buf.readBoolean(),
                             buf.readBoolean()
                     );
                 }
@@ -53,14 +56,16 @@ public record UpdateWardPayload(
                 @Override
                 public void encode(RegistryFriendlyByteBuf buf, UpdateWardPayload p) {
                     buf.writeBlockPos(p.pos());
-                    buf.writeVarInt(p.chunkRadius());
+                    buf.writeBoolean(p.enabled());
+                    buf.writeBoolean(p.chunkMode());
+                    buf.writeVarInt(p.range());
                     buf.writeDouble(p.damage());
                     buf.writeVarInt(p.interval());
-                    buf.writeBoolean(p.announce());
                     buf.writeBoolean(p.glowing());
                     buf.writeBoolean(p.slow());
-                    buf.writeVarInt(p.slowAmplifier());
-                    buf.writeBoolean(p.enabled());
+                    buf.writeBoolean(p.announce());
+                    buf.writeBoolean(p.teleportDrops());
+                    buf.writeBoolean(p.teleportXp());
                 }
             };
 
@@ -82,8 +87,8 @@ public record UpdateWardPayload(
             BlockEntity be = level.getBlockEntity(pos);
             if (!(be instanceof WardSourceBlockEntity ward)) return;
 
-            ward.applyAll(p.chunkRadius(), p.damage(), p.interval(),
-                    p.announce(), p.glowing(), p.slow(), p.slowAmplifier(), p.enabled());
+            ward.applyAll(p.enabled(), p.chunkMode(), p.range(), p.damage(), p.interval(),
+                    p.glowing(), p.slow(), p.announce(), p.teleportDrops(), p.teleportXp());
         });
     }
 }
