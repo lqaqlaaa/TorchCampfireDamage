@@ -84,7 +84,7 @@ public class WardCampfireBlock extends Block implements EntityBlock {
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new WardSourceBlockEntity(ModBlocks.WARD_SOURCE_BE.get(), pos, state);
+        return new WardSourceBlockEntity(pos, state);
     }
 
     /** 火焰粒子（仅点燃时） */
