@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import com.torchcampfiredamage.events.DamageEventHandler;
 
 /**
  * 守卫火源 BlockEntity —— 参数存在方块自身，跟着方块走。
@@ -39,6 +40,24 @@ public class WardSourceBlockEntity extends BlockEntity {
 
     public WardSourceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlocks.WARD_SOURCE_BE.get(), pos, state);
+    }
+
+    /* ===== 注册到伤害处理器（性能关键：避免全局扫描） ===== */
+
+    @Override
+    public void setLevel(net.minecraft.world.level.Level level) {
+        super.setLevel(level);
+        if (level != null && !level.isClientSide) {
+            DamageEventHandler.register(level, getBlockPos());
+        }
+    }
+
+    @Override
+    public void setRemoved() {
+        if (level != null && !level.isClientSide) {
+            DamageEventHandler.unregister(level, getBlockPos());
+        }
+        super.setRemoved();
     }
 
     /* ===== getter ===== */
