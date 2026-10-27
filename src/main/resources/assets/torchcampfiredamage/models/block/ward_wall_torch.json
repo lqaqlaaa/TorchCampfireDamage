@@ -1,24 +1,24 @@
 {
   "ambientocclusion": false,
   "textures": {
-    "particle": "minecraft:block/torch",
-    "torch": "minecraft:block/torch"
+    "torch": "minecraft:block/torch",
+    "particle": "minecraft:block/torch"
   },
   "elements": [
     {
       "from": [
-        7,
-        0,
-        6
+        -1,
+        3.5,
+        7
       ],
       "to": [
-        9,
-        10,
-        8
+        1,
+        13.5,
+        9
       ],
       "rotation": {
         "origin": [
-          8,
+          0,
           3.5,
           8
         ],
@@ -27,15 +27,6 @@
       },
       "shade": false,
       "faces": {
-        "up": {
-          "uv": [
-            7,
-            6,
-            9,
-            8
-          ],
-          "texture": "#torch"
-        },
         "down": {
           "uv": [
             7,
@@ -45,24 +36,39 @@
           ],
           "texture": "#torch"
         },
-        "north": {
+        "up": {
           "uv": [
             7,
             6,
             9,
-            16
+            8
           ],
           "texture": "#torch"
-        },
-        "south": {
-          "uv": [
-            7,
-            6,
-            9,
-            16
-          ],
-          "texture": "#torch"
-        },
+        }
+      }
+    },
+    {
+      "from": [
+        -1,
+        3.5,
+        0
+      ],
+      "to": [
+        1,
+        19.5,
+        16
+      ],
+      "rotation": {
+        "origin": [
+          0,
+          3.5,
+          8
+        ],
+        "axis": "z",
+        "angle": -22.5
+      },
+      "shade": false,
+      "faces": {
         "west": {
           "uv": [
             7,
@@ -73,6 +79,48 @@
           "texture": "#torch"
         },
         "east": {
+          "uv": [
+            7,
+            6,
+            9,
+            16
+          ],
+          "texture": "#torch"
+        }
+      }
+    },
+    {
+      "from": [
+        -8,
+        3.5,
+        7
+      ],
+      "to": [
+        8,
+        19.5,
+        9
+      ],
+      "rotation": {
+        "origin": [
+          0,
+          3.5,
+          8
+        ],
+        "axis": "z",
+        "angle": -22.5
+      },
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            7,
+            6,
+            9,
+            16
+          ],
+          "texture": "#torch"
+        },
+        "south": {
           "uv": [
             7,
             6,
