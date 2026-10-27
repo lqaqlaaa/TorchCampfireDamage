@@ -1,12 +1,19 @@
 package com.torchcampfiredamage;
 
+import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.events.DamageEventHandler;
+import com.torchcampfiredamage.events.InteractionHandler;
+import com.torchcampfiredamage.network.UpdateWardPayload;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig.Type;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,14 +26,38 @@ public class TorchCampfireDamage {
     public TorchCampfireDamage(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("[TorchCampfireDamage] Constructing mod...");
 
-        // 注册配置
+        // 配置
         modContainer.registerConfig(Type.COMMON, ModConfig.SPEC);
-        LOGGER.info("[TorchCampfireDamage] Config registered.");
 
-        // 用实例注册，确保 @SubscribeEvent 被扫描
+        // 方块 / 物品 / 方块实体
+        ModBlocks.register(modEventBus);
+
+        // 游戏事件
         NeoForge.EVENT_BUS.register(new DamageEventHandler());
-        LOGGER.info("[TorchCampfireDamage] Event handler registered on NeoForge.EVENT_BUS.");
+        NeoForge.EVENT_BUS.register(new InteractionHandler());
+
+        // 网络包
+        modEventBus.addListener(this::registerPayloads);
+
+        // 创造模式物品栏
+        modEventBus.addListener(this::addToCreativeTab);
 
         LOGGER.info("[TorchCampfireDamage] Mod constructed successfully.");
+    }
+
+    private void registerPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1");
+        registrar.playToServer(
+                UpdateWardPayload.TYPE,
+                UpdateWardPayload.CODEC,
+                UpdateWardPayload::handle);
+        LOGGER.info("[TorchCampfireDamage] Payloads registered.");
+    }
+
+    private void addToCreativeTab(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
+            event.accept(ModBlocks.WARD_TORCH_ITEM.get());
+            event.accept(ModBlocks.WARD_CAMPFIRE_ITEM.get());
+        }
     }
 }
