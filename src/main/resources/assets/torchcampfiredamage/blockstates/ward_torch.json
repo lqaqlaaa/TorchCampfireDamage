@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "torchcampfiredamage:block/ward_torch"
+    }
+  }
+}
