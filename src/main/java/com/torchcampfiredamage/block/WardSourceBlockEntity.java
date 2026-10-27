@@ -32,12 +32,8 @@ public class WardSourceBlockEntity extends CampfireBlockEntity {
     private boolean teleportDrops = true;
     private boolean teleportXp = true;
 
-    public WardSourceBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
-        super(type, pos, state);
-    }
-
     public WardSourceBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlocks.WARD_SOURCE_BE.get(), pos, state);
+        super(pos, state);
     }
 
     /* ===== getter ===== */
