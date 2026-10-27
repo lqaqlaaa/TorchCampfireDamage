@@ -4,7 +4,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class ModConfig {
     public static final ModConfigSpec SPEC;
-    public static final ModConfigSpec.ConfigValue<Integer> DAMAGE_RADIUS;
+    public static final ModConfigSpec.ConfigValue<Integer> CHUNK_RADIUS;
     public static final ModConfigSpec.ConfigValue<Double> DAMAGE_AMOUNT;
     public static final ModConfigSpec.ConfigValue<Integer> DAMAGE_INTERVAL;
     public static final ModConfigSpec.ConfigValue<Boolean> ENABLE_CAMPFIRE;
@@ -14,24 +14,27 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> TELEPORT_DROPS;
     public static final ModConfigSpec.ConfigValue<Boolean> COUNT_AS_PLAYER_KILL;
     public static final ModConfigSpec.ConfigValue<Boolean> IGNORE_NAMED_MOBS;
+    public static final ModConfigSpec.ConfigValue<Boolean> TREAT_PROVOKED_AS_HOSTILE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        
-        builder.comment("Torch Campfire Damage Configuration")
-               .push("general");
 
-        DAMAGE_RADIUS = builder
-                .comment("检测范围（方块）- 篝火和火把周围多少格内的敌对生物会受到伤害")
-                .defineInRange("damageRadius", 8, 1, 64);
+        builder.comment("Torch Campfire Damage Configuration").push("general");
+
+        CHUNK_RADIUS = builder
+                .comment("区块范围半径。0 = 只有放置所在的那个区块生效（1x1 区块），",
+                        "1 = 向外扩散 1 个区块（3x3），2 = 5x5，3 = 7x7，4 = 9x9。",
+                        "以方块所在的区块为中心，整个受影响范围内的敌对生物都会被伤害。",
+                        "范围过大可能影响性能，请谨慎设置。")
+                .defineInRange("chunkRadius", 0, 0, 4);
 
         DAMAGE_AMOUNT = builder
                 .comment("每次伤害量（半颗心为单位，2.0 = 1颗心）")
-                .defineInRange("damageAmount", 2.0, 0.5, 100.0);
+                .define("damageAmount", 2.0);
 
         DAMAGE_INTERVAL = builder
-                .comment("伤害间隔（tick，20 tick = 1秒）")
-                .defineInRange("damageInterval", 20, 5, 200);
+                .comment("伤害间隔（tick，20 tick = 1秒，1 = 每tick伤害），最小值 1")
+                .defineInRange("damageInterval", 20, 1, Integer.MAX_VALUE);
 
         ENABLE_CAMPFIRE = builder
                 .comment("是否启用普通篝火")
@@ -60,6 +63,11 @@ public class ModConfig {
         IGNORE_NAMED_MOBS = builder
                 .comment("是否忽略被命名的生物")
                 .define("ignoreNamedMobs", true);
+
+        TREAT_PROVOKED_AS_HOSTILE = builder
+                .comment("当开启时，原本中立的生物（如僵尸猪灵、末影人、蜜蜂、狼、铁傀儡等）",
+                        "一旦主动攻击玩家或有当前攻击目标，也会被视为敌对并被伤害。")
+                .define("treatProvokedAsHostile", true);
 
         builder.pop();
         SPEC = builder.build();
