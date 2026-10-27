@@ -10,6 +10,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -41,6 +43,10 @@ public class DamageEventHandler {
     private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
     /** 生物UUID -> 掉落物/经验应传送到的火源位置 */
     private static final Map<UUID, BlockPos> entityDropTargets = new HashMap<>();
+    /** 发光中的生物 UUID -> 到期游戏时间 */
+    private static final Map<UUID, Long> GLOW_EXPIRY = new HashMap<>();
+    /** 需要检查发光过期的 UUID 集合 */
+    private static final Set<UUID> GLOW_TRACKED = new HashSet<>();
 
     /* ============ 火源判定 ============ */
 
@@ -127,6 +133,10 @@ public class DamageEventHandler {
         }
 
         final long gameTime = level.getGameTime();
+
+        // 发光过期检查必须每 tick 执行，不受扫描节流影响
+        tickGlowExpiry(level);
+
         if (gameTime % SCAN_STEP != 0) {
             return;
         }
@@ -212,6 +222,9 @@ public class DamageEventHandler {
                 entityDropTargets.put(mob.getUUID(), center);
             }
 
+            // 命中附加效果：发光 / 减速
+            applyHitEffects(mob);
+
             mob.hurt(source, damage);
             damagedThisTick.add(mob.getUUID());
 
@@ -221,6 +234,52 @@ public class DamageEventHandler {
             } else {
                 // 死亡：播报击杀信息
                 announceKill(level, center, mob, owner);
+            }
+        }
+    }
+
+    /* ============ 命中附加效果 ============ */
+
+    /**
+     * 给被命中的生物施加发光 / 减速效果。
+     * 效果持续时间内每次命中都会刷新时限。
+     */
+    private static void applyHitEffects(Mob mob) {
+        if (ModConfig.GLOW_HIT_TARGETS.get()) {
+            mob.setGlowingTag(true);
+            // 用自定义计时器控制发光结束
+            GLOW_EXPIRY.put(mob.getUUID(), mob.level().getGameTime() + ModConfig.GLOW_DURATION.get());
+            GLOW_TRACKED.add(mob.getUUID());
+        }
+
+        if (ModConfig.SLOW_HIT_TARGETS.get()) {
+            mob.addEffect(new MobEffectInstance(
+                    MobEffects.MOVEMENT_SLOWDOWN,
+                    ModConfig.SLOW_DURATION.get(),
+                    ModConfig.SLOW_AMPLIFIER.get(),
+                    false,  // ambient
+                    false,  // 不显示粒子
+                    true    // 显示图标
+            ));
+        }
+    }
+
+    /** 检查并移除已过期的发光标记 */
+    public static void tickGlowExpiry(Level level) {
+        if (GLOW_TRACKED.isEmpty()) {
+            return;
+        }
+        long now = level.getGameTime();
+        Iterator<UUID> it = GLOW_TRACKED.iterator();
+        while (it.hasNext()) {
+            UUID id = it.next();
+            Long expiry = GLOW_EXPIRY.get(id);
+            if (expiry == null || now >= expiry) {
+                if (level.getEntity(id) instanceof Mob mob) {
+                    mob.setGlowingTag(false);
+                }
+                GLOW_EXPIRY.remove(id);
+                it.remove();
             }
         }
     }
