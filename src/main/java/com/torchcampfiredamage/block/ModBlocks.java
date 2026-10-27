@@ -1,7 +1,6 @@
 package com.torchcampfiredamage.block;
 
 import com.torchcampfiredamage.TorchCampfireDamage;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -44,7 +43,7 @@ public class ModBlocks {
                     .lightLevel(s -> 14)
                     .sound(SoundType.WOOD)
                     .pushReaction(PushReaction.DESTROY)
-                    .lootFrom(WARD_TORCH)));
+                    ));
 
     /** 守卫篝火（原版 CampfireBlock 特性：烹饪/点火/水灭/灼烧） */
     public static final DeferredBlock<Block> WARD_CAMPFIRE = BLOCKS.register("ward_campfire",
@@ -65,7 +64,7 @@ public class ModBlocks {
     /** 三个方块共用一个 BlockEntity 类型 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WardSourceBlockEntity>> WARD_SOURCE_BE =
             BLOCK_ENTITIES.register("ward_source", () -> BlockEntityType.Builder.of(
-                    WardSourceBlockEntity::new,
+                    (pos, state) -> new WardSourceBlockEntity(WARD_SOURCE_BE.get(), pos, state),
                     WARD_TORCH.get(), WARD_WALL_TORCH.get(), WARD_CAMPFIRE.get()
             ).build(null));
 
