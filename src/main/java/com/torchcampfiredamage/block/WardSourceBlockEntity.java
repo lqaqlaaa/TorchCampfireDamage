@@ -28,6 +28,11 @@ public class WardSourceBlockEntity extends BlockEntity {
         super(type, pos, state);
     }
 
+    /** BlockEntityType.Builder 需要的 (pos, state) 构造签名 */
+    public WardSourceBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlocks.WARD_SOURCE_BE.get(), pos, state);
+    }
+
     /* ===== getter ===== */
     public int getChunkRadius() { return chunkRadius; }
     public double getDamage() { return damage; }
