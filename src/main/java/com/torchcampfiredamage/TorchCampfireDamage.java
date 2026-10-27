@@ -7,17 +7,26 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig.Type;
 import net.neoforged.neoforge.common.NeoForge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Mod(TorchCampfireDamage.MOD_ID)
 public class TorchCampfireDamage {
     public static final String MOD_ID = "torchcampfiredamage";
     public static final String MOD_NAME = "Torch Campfire Damage";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
 
     public TorchCampfireDamage(IEventBus modEventBus, ModContainer modContainer) {
-        // 注册配置（1.21.1 新 API：通过 ModContainer）
-        modContainer.registerConfig(Type.COMMON, ModConfig.SPEC);
+        LOGGER.info("[TorchCampfireDamage] Constructing mod...");
 
-        // 注册事件处理器到游戏事件总线
-        NeoForge.EVENT_BUS.register(DamageEventHandler.class);
+        // 注册配置
+        modContainer.registerConfig(Type.COMMON, ModConfig.SPEC);
+        LOGGER.info("[TorchCampfireDamage] Config registered.");
+
+        // 用实例注册，确保 @SubscribeEvent 被扫描
+        NeoForge.EVENT_BUS.register(new DamageEventHandler());
+        LOGGER.info("[TorchCampfireDamage] Event handler registered on NeoForge.EVENT_BUS.");
+
+        LOGGER.info("[TorchCampfireDamage] Mod constructed successfully.");
     }
 }
