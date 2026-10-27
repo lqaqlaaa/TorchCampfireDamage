@@ -1,3 +1,6 @@
 {
-  "parent": "torchcampfiredamage:block/ward_torch"
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:block/torch"
+  }
 }
