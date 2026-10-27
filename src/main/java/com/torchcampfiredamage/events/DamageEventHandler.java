@@ -96,7 +96,7 @@ public class DamageEventHandler {
                     owners.put(immutablePos, player.getUUID());
                 }
 
-                long lastTime = damageTimes.getOrDefault(immutablePos, -interval);
+                long lastTime = damageTimes.getOrDefault(immutablePos, -(long) interval);
                 if (currentTime - lastTime < interval) {
                     continue;
                 }
