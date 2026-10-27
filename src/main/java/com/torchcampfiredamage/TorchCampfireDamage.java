@@ -57,7 +57,6 @@ public class TorchCampfireDamage {
     private void addToCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(ModBlocks.WARD_TORCH_ITEM.get());
-            event.accept(ModBlocks.WARD_CAMPFIRE_ITEM.get());
         }
     }
 }
