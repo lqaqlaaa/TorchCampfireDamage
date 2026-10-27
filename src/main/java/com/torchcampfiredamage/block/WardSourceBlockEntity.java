@@ -6,18 +6,15 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * 守卫火源 BlockEntity —— 参数存在方块自身（跟着方块走，不受坐标变动影响）。
- * <p>
- * 同时承载篝火烹饪槽位（4 个），让守卫篝火具备原版烹饪能力。
- * 火把不使用这些槽位，但保留数据结构无副作用。
+ * 守卫火源 BlockEntity —— 所有参数都存在方块自身，跟着方块走。
  */
-public class WardSourceBlockEntity extends net.minecraft.world.level.block.entity.CampfireBlockEntity {
+public class WardSourceBlockEntity extends BlockEntity {
 
-    /* ===== 参数 ===== */
     private int chunkRadius = 1;
     private double damage = 2.0;
     private int interval = 20;
@@ -31,7 +28,7 @@ public class WardSourceBlockEntity extends net.minecraft.world.level.block.entit
         super(type, pos, state);
     }
 
-    /* ===== getter / setter ===== */
+    /* ===== getter ===== */
     public int getChunkRadius() { return chunkRadius; }
     public double getDamage() { return damage; }
     public int getInterval() { return interval; }
@@ -41,7 +38,7 @@ public class WardSourceBlockEntity extends net.minecraft.world.level.block.entit
     public int getSlowAmplifier() { return slowAmplifier; }
     public boolean isEnabled() { return enabled; }
 
-    /** 一次性写入全部参数（来自 GUI 保存） */
+    /** 一次性写入全部参数 */
     public void applyAll(int radius, double dmg, int itv, boolean announ,
                          boolean glow, boolean slw, int amp, boolean en) {
         this.chunkRadius = Math.max(0, Math.min(4, radius));
@@ -61,8 +58,8 @@ public class WardSourceBlockEntity extends net.minecraft.world.level.block.entit
     /* ===== 存储 ===== */
 
     @Override
-    public void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries); // 保存烹饪槽位
+    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putInt("chunkRadius", chunkRadius);
         tag.putDouble("damage", damage);
         tag.putInt("interval", interval);
@@ -74,8 +71,8 @@ public class WardSourceBlockEntity extends net.minecraft.world.level.block.entit
     }
 
     @Override
-    public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries); // 读取烹饪槽位
+    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         if (tag.contains("chunkRadius")) chunkRadius = tag.getInt("chunkRadius");
         if (tag.contains("damage")) damage = tag.getDouble("damage");
         if (tag.contains("interval")) interval = tag.getInt("interval");
@@ -86,7 +83,7 @@ public class WardSourceBlockEntity extends net.minecraft.world.level.block.entit
         if (tag.contains("enabled")) enabled = tag.getBoolean("enabled");
     }
 
-    /* ===== 同步 ===== */
+    /* ===== 客户端同步 ===== */
 
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
