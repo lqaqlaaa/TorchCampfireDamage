@@ -1,7 +1,5 @@
 {
   "block.torchcampfiredamage.ward_torch": "Ward Torch",
   "block.torchcampfiredamage.ward_wall_torch": "Ward Torch",
-  "block.torchcampfiredamage.ward_campfire": "Ward Campfire",
-  "item.torchcampfiredamage.ward_torch": "Ward Torch",
-  "item.torchcampfiredamage.ward_campfire": "Ward Campfire"
+  "item.torchcampfiredamage.ward_torch": "Ward Torch"
 }
