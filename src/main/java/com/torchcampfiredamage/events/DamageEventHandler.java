@@ -60,7 +60,16 @@ public class DamageEventHandler {
 
     public static void register(Level level, BlockPos pos) {
         if (level.isClientSide()) return;
-        REGISTERED.computeIfAbsent(level, k -> new HashSet<>()).add(pos.immutable());
+        Set<BlockPos> set = REGISTERED.get(level);
+        if (set == null) {
+            set = new HashSet<>();
+            REGISTERED.put(level, set);
+        }
+        // BlockPos 已由调用方保证不可变，避免重复生成对象
+        if (set.size() > 4096) {
+            set.clear();   // 防御：异常膨胀时重置，下次 tick 会重新登记
+        }
+        set.add(pos);
     }
 
     public static void unregister(Level level, BlockPos pos) {
@@ -97,11 +106,13 @@ public class DamageEventHandler {
             double maxX = (double) (cx + r + 1) * CHUNK_SIZE;
             double minZ = (double) (cz - r) * CHUNK_SIZE;
             double maxZ = (double) (cz + r + 1) * CHUNK_SIZE;
-            // Y 轴限制在本维度合理范围，避免 AABB 过大导致实体查询扫全图
-            return new AABB(minX, center.getY() - 256, minZ, maxX, center.getY() + 256, maxZ);
+            // Y 轴只取 128 格（原版怪物活动/巡逻范围级别），避免大范围实体查询
+            double y = center.getY();
+            return new AABB(minX, y - 64, minZ, maxX, y + 64, maxZ);
         } else {
             double r = ward.getBlockRadius() + 0.5;
-            return AABB.ofSize(Vec3.atCenterOf(center), r * 2, r * 2, r * 2);
+            double y = Math.min(r, 64);
+            return AABB.ofSize(Vec3.atCenterOf(center), r * 2, y * 2, r * 2);
         }
     }
 
@@ -125,22 +136,45 @@ public class DamageEventHandler {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
+        long t0 = System.nanoTime();
         try {
             handle(serverLevel);
         } catch (Throwable t) {
             System.out.println("[TorchCampfireDamage] tick error: " + t);
             t.printStackTrace();
         }
+        // 性能诊断：每 100 tick 报告一次耗时
+        long used = System.nanoTime() - t0;
+        PROF_TOTAL_NS += used;
+        PROF_TICKS++;
+        if (PROF_TICKS >= 100) {
+            long avgUs = PROF_TOTAL_NS / PROF_TICKS / 1000;
+            if (avgUs > 50) {   // 超过 50 微秒才报告（正常应 <5µs）
+                System.out.println("[TorchCampfireDamage][PERF] avg=" + avgUs + "us/tick"
+                        + " torches=" + (REGISTERED.get(serverLevel) == null ? 0 : REGISTERED.get(serverLevel).size())
+                        + " glow=" + GLOW_EXPIRY.size()
+                        + " pending=" + pendingCleanup.size());
+            }
+            PROF_TOTAL_NS = 0;
+            PROF_TICKS = 0;
+        }
     }
 
-    private static void handle(ServerLevel level) {
-        tickGlowExpiry(level);
-        cleanPending(level);
+    private static long PROF_TOTAL_NS = 0;
+    private static int PROF_TICKS = 0;
 
+    private static void handle(ServerLevel level) {
+        // 极高性价比：没有火把时立刻返回，不碰任何 Map
         Set<BlockPos> torches = REGISTERED.get(level);
         if (torches == null || torches.isEmpty()) {
+            // 仅当有过期发光/待清理项时才做清理
+            if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
+            if (!pendingCleanup.isEmpty()) cleanPending(level);
             return;
         }
+
+        if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
+        if (!pendingCleanup.isEmpty()) cleanPending(level);
 
         long gameTime = level.getGameTime();
         if (gameTime % SCAN_STEP != 0) {
