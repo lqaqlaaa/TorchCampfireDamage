@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="torchcampfiredamage"
+version="1.0.0"
+displayName="Torch Campfire Damage"
+description='''Campfires and torches damage hostile mobs in range, with player kill attribution and drop teleportation.'''
+authors="Custom"
+credits=""
+
+[[dependencies.torchcampfiredamage]]
+modId="neoforge"
+type="required"
+versionRange="[21.1,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.torchcampfiredamage]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.22)"
+ordering="NONE"
+side="BOTH"
