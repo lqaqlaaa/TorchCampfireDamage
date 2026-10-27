@@ -1,5 +1,6 @@
 package com.torchcampfiredamage.events;
 
+import com.torchcampfiredamage.block.WardCampfireBlock;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
@@ -21,7 +22,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import com.torchcampfiredamage.block.WardCampfireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -37,19 +37,22 @@ import java.util.*;
 public class DamageEventHandler {
     private static final int SCAN_STEP = 5;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
-    /** 最大搜索半径：9x9 区块 → 5 区块半径 */
     private static final int MAX_SEARCH_CHUNKS = 4;
 
     private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new WeakHashMap<>();
     private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
-    private static final Map<UUID, BlockPos> entityDropTargets = new HashMap<>();
+    /** 生物UUID -> 传送目标（掉落物/经验） */
+    private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
     private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
 
     private static boolean DEBUG_PRINTED = false;
 
+    /** 生物死亡时掉落物/经验应传送到的位置，以及各自开关 */
+    public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
+
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
-        System.out.println("[TorchCampfireDamage] Server started. Ward blocks registered.");
+        System.out.println("[TorchCampfireDamage] Server started. Ward blocks ready.");
     }
 
     private static <T> T safeGet(java.util.function.Supplier<T> supplier, T def) {
@@ -62,14 +65,21 @@ public class DamageEventHandler {
 
     /* ================= 区域 ================= */
 
-    private static AABB chunkAABB(BlockPos pos, int chunkRadius) {
-        int cx = SectionPos.blockToSectionCoord(pos.getX());
-        int cz = SectionPos.blockToSectionCoord(pos.getZ());
-        double minX = (double) (cx - chunkRadius) * CHUNK_SIZE;
-        double maxX = (double) (cx + chunkRadius + 1) * CHUNK_SIZE;
-        double minZ = (double) (cz - chunkRadius) * CHUNK_SIZE;
-        double maxZ = (double) (cz + chunkRadius + 1) * CHUNK_SIZE;
-        return new AABB(minX, -1.0e9, minZ, maxX, 1.0e9, maxZ);
+    /** 由方块模式/区块模式决定实际检测盒 */
+    private static AABB damageArea(BlockPos center, WardSourceBlockEntity ward) {
+        if (ward.isChunkMode()) {
+            int r = ward.getChunkRadius();
+            int cx = SectionPos.blockToSectionCoord(center.getX());
+            int cz = SectionPos.blockToSectionCoord(center.getZ());
+            double minX = (double) (cx - r) * CHUNK_SIZE;
+            double maxX = (double) (cx + r + 1) * CHUNK_SIZE;
+            double minZ = (double) (cz - r) * CHUNK_SIZE;
+            double maxZ = (double) (cz + r + 1) * CHUNK_SIZE;
+            return new AABB(minX, -1.0e9, minZ, maxX, 1.0e9, maxZ);
+        } else {
+            double r = ward.getBlockRadius() + 0.5;
+            return AABB.ofSize(Vec3.atCenterOf(center), r * 2, r * 2, r * 2);
+        }
     }
 
     /* ================= 敌对判定 ================= */
@@ -144,13 +154,7 @@ public class DamageEventHandler {
 
                 activePositions.add(ip);
 
-                int chunkRadius = ward.getChunkRadius();
-                double damage = ward.getDamage();
                 int interval = Math.max(1, ward.getInterval());
-                boolean announce = ward.isAnnounce();
-                boolean glowing = ward.isGlowing();
-                boolean slow = ward.isSlow();
-                int slowAmp = ward.getSlowAmplifier();
 
                 // 归属最近玩家
                 UUID cur = owners.get(ip);
@@ -163,34 +167,38 @@ public class DamageEventHandler {
                 long last = damageTimes.getOrDefault(ip, Long.MIN_VALUE / 2);
                 if (gameTime - last < interval) continue;
 
-                damageHostiles(level, ip, chunkRadius, (float) damage, owners.get(ip),
-                        damagedThisTick, announce, glowing, slow, slowAmp);
+                damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick);
                 damageTimes.put(ip, gameTime);
             }
         }
 
-        // 清理失效位置
         damageTimes.keySet().removeIf(p -> !(level.getBlockEntity(p) instanceof WardSourceBlockEntity));
         owners.keySet().removeIf(p -> !(level.getBlockEntity(p) instanceof WardSourceBlockEntity));
     }
 
     /* ================= 伤害（含强制扣血） ================= */
 
-    private static void damageHostiles(ServerLevel level, BlockPos center, int chunkRadius,
-                                       float damage, UUID ownerUUID, Set<UUID> damagedThisTick,
-                                       boolean announce, boolean glowing, boolean slow, int slowAmp) {
-        AABB area = chunkAABB(center, chunkRadius);
+    private static void damageHostiles(ServerLevel level, BlockPos center, WardSourceBlockEntity ward,
+                                       UUID ownerUUID, Set<UUID> damagedThisTick) {
+        AABB area = damageArea(center, ward);
         Player owner = ownerUUID == null ? null : level.getPlayerByUUID(ownerUUID);
+
+        float damage = (float) ward.getDamage();
+        boolean glowing = ward.isGlowing();
+        boolean slow = ward.isSlow();
+        boolean announce = ward.isAnnounce();
+        boolean tpDrops = ward.isTeleportDrops();
+        boolean tpXp = ward.isTeleportXp();
+
         boolean countAsKill = safeGet(ModConfig.COUNT_AS_PLAYER_KILL::get, true);
         boolean ignoreNamed = safeGet(ModConfig.IGNORE_NAMED_MOBS::get, true);
-        boolean tpDrops = safeGet(ModConfig.TELEPORT_DROPS::get, true);
 
         for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
             if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
             if (!isHostileToPlayers(mob)) continue;
 
-            // 标记/减速（伤害为 0 时也生效）
+            // 标记 / 减速（伤害为 0 也生效）
             if (glowing) {
                 mob.setGlowingTag(true);
                 GLOW_EXPIRY.put(mob, level.getGameTime() + safeGet(ModConfig.GLOW_DURATION::get, 100));
@@ -199,23 +207,26 @@ public class DamageEventHandler {
                 mob.addEffect(new MobEffectInstance(
                         MobEffects.MOVEMENT_SLOWDOWN,
                         Math.max(1, safeGet(ModConfig.SLOW_DURATION::get, 100)),
-                        Math.min(254, Math.max(0, slowAmp)),
+                        Math.min(254, Math.max(0, ward.getSlowAmplifier())),
                         false, false, true));
             }
 
-            if (damage <= 0) continue;
+            if (damage <= 0) {
+                damagedThisTick.add(mob.getUUID());
+                continue;
+            }
 
             DamageSource src = (countAsKill && owner != null)
                     ? level.damageSources().playerAttack(owner)
                     : level.damageSources().magic();
 
-            if (tpDrops) {
-                entityDropTargets.put(mob.getUUID(), center);
+            if (tpDrops || tpXp) {
+                entityDropTargets.put(mob.getUUID(), new DropTarget(center, tpDrops, tpXp));
             }
 
             boolean hurtOk = mob.hurt(src, damage);
 
-            // 强制扣血：未造成伤害 或 血量没变化（被无敌帧/免疫/抗性挡下）
+            // 强制扣血：被无敌帧 / 免疫 / 抗性挡下时直接改血量
             if (!hurtOk) {
                 mob.invulnerableTime = 0;
                 float nh = mob.getHealth() - damage;
@@ -263,7 +274,7 @@ public class DamageEventHandler {
         String sourceName = (st.getBlock() instanceof WardCampfireBlock) ? "守卫篝火" : "守卫火把";
 
         Component msg = Component.empty()
-                .append(Component.literal("🔥 [" + sourceName + " " + coord + "] ").withStyle(ChatFormatting.GOLD))
+                .append(Component.literal("[" + sourceName + " " + coord + "] ").withStyle(ChatFormatting.GOLD))
                 .append(Component.literal(mob.getName().getString()).withStyle(ChatFormatting.YELLOW))
                 .append(Component.literal(" 被烧死了").withStyle(ChatFormatting.GRAY));
 
@@ -286,12 +297,13 @@ public class DamageEventHandler {
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        BlockPos target = entityDropTargets.get(entity.getUUID());
-        if (target == null) return;
-        if (!(level.getBlockEntity(target) instanceof WardSourceBlockEntity)) return;
+        DropTarget target = entityDropTargets.get(entity.getUUID());
+        if (target == null || !target.drops()) return;
+        if (!(level.getBlockEntity(target.pos()) instanceof WardSourceBlockEntity)) return;
 
+        BlockPos tp = target.pos();
         for (ItemEntity item : event.getDrops()) {
-            item.setPos(target.getX() + 0.5, target.getY() + 1.0, target.getZ() + 0.5);
+            item.setPos(tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5);
             item.setDeltaMovement(Vec3.ZERO);
         }
     }
@@ -304,22 +316,24 @@ public class DamageEventHandler {
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        BlockPos target = entityDropTargets.get(entity.getUUID());
-        if (target == null) return;
+        DropTarget target = entityDropTargets.get(entity.getUUID());
+        if (target == null || !target.xp()) return;
         if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
-        if (!(level.getBlockEntity(target) instanceof WardSourceBlockEntity)) return;
+        if (!(level.getBlockEntity(target.pos()) instanceof WardSourceBlockEntity)) return;
 
         int xp = event.getDroppedExperience();
         if (xp <= 0) return;
 
+        BlockPos tp = target.pos();
         event.setDroppedExperience(0);
+
         ExperienceOrb orb = new ExperienceOrb(level,
-                target.getX() + 0.5, target.getY() + 1.0, target.getZ() + 0.5, xp);
+                tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5, xp);
         orb.setDeltaMovement(Vec3.ZERO);
         level.addFreshEntity(orb);
 
         if (safeGet(ModConfig.PLAY_SOUND::get, true)) {
-            level.playSound(null, target, SoundEvents.EXPERIENCE_ORB_PICKUP,
+            level.playSound(null, tp, SoundEvents.EXPERIENCE_ORB_PICKUP,
                     SoundSource.PLAYERS, 0.4f, 1.6f);
         }
     }
