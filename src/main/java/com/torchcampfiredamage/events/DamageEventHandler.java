@@ -1,6 +1,6 @@
 package com.torchcampfiredamage.events;
 
-import com.torchcampfiredamage.block.WardCampfireBlock;
+import net.minecraft.world.level.block.CampfireBlock;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
@@ -146,9 +146,9 @@ public class DamageEventHandler {
 
                 // 篝火需要点燃
                 BlockState state = level.getBlockState(ip);
-                if (state.getBlock() instanceof WardCampfireBlock
-                        && state.hasProperty(WardCampfireBlock.LIT)
-                        && !state.getValue(WardCampfireBlock.LIT)) {
+                if (state.getBlock() instanceof CampfireBlock
+                        && state.hasProperty(CampfireBlock.LIT)
+                        && !state.getValue(CampfireBlock.LIT)) {
                     continue;
                 }
 
@@ -271,7 +271,7 @@ public class DamageEventHandler {
 
         String coord = String.format("(%d, %d, %d)", sourcePos.getX(), sourcePos.getY(), sourcePos.getZ());
         BlockState st = level.getBlockState(sourcePos);
-        String sourceName = (st.getBlock() instanceof WardCampfireBlock) ? "守卫篝火" : "守卫火把";
+        String sourceName = (st.getBlock() instanceof CampfireBlock) ? "守卫篝火" : "守卫火把";
 
         Component msg = Component.empty()
                 .append(Component.literal("[" + sourceName + " " + coord + "] ").withStyle(ChatFormatting.GOLD))
