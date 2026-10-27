@@ -1,7 +1,5 @@
 {
   "block.torchcampfiredamage.ward_torch": "守卫火把",
   "block.torchcampfiredamage.ward_wall_torch": "守卫火把",
-  "block.torchcampfiredamage.ward_campfire": "守卫篝火",
-  "item.torchcampfiredamage.ward_torch": "守卫火把",
-  "item.torchcampfiredamage.ward_campfire": "守卫篝火"
+  "item.torchcampfiredamage.ward_torch": "守卫火把"
 }
