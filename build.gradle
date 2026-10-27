@@ -24,13 +24,9 @@ repositories {
     }
 }
 
-dependencies {
-    implementation "net.neoforged:neoforge:21.1.72"
-}
-
 neoForge {
     version = '21.1.72'
-    
+
     runs {
         client {
             client()
@@ -39,7 +35,7 @@ neoForge {
             server()
         }
     }
-    
+
     mods {
         torchcampfiredamage {
             sourceSet sourceSets.main
