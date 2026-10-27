@@ -4,7 +4,6 @@ import com.torchcampfiredamage.TorchCampfireDamage;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -14,7 +13,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 客户端 -> 服务端：保存某个守卫方块的全部参数（直接写入它的 BlockEntity）。
+ * 客户端 -> 服务端：保存守卫方块参数。
+ * 手动实现 codec（字段较多，超出 StreamCodec.composite 的 8 组上限）。
  */
 public record UpdateWardPayload(
         BlockPos pos,
@@ -34,18 +34,35 @@ public record UpdateWardPayload(
     public static final Type<UpdateWardPayload> TYPE = new Type<>(ID);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, UpdateWardPayload> CODEC =
-            StreamCodec.composite(
-                    BlockPos.STREAM_CODEC, UpdateWardPayload::pos,
-                    ByteBufCodecs.VAR_INT, UpdateWardPayload::chunkRadius,
-                    ByteBufCodecs.DOUBLE, UpdateWardPayload::damage,
-                    ByteBufCodecs.VAR_INT, UpdateWardPayload::interval,
-                    ByteBufCodecs.BOOL, UpdateWardPayload::announce,
-                    ByteBufCodecs.BOOL, UpdateWardPayload::glowing,
-                    ByteBufCodecs.BOOL, UpdateWardPayload::slow,
-                    ByteBufCodecs.VAR_INT, UpdateWardPayload::slowAmplifier,
-                    ByteBufCodecs.BOOL, UpdateWardPayload::enabled,
-                    UpdateWardPayload::new
-            );
+            new StreamCodec<>() {
+                @Override
+                public UpdateWardPayload decode(RegistryFriendlyByteBuf buf) {
+                    return new UpdateWardPayload(
+                            buf.readBlockPos(),
+                            buf.readVarInt(),
+                            buf.readDouble(),
+                            buf.readVarInt(),
+                            buf.readBoolean(),
+                            buf.readBoolean(),
+                            buf.readBoolean(),
+                            buf.readVarInt(),
+                            buf.readBoolean()
+                    );
+                }
+
+                @Override
+                public void encode(RegistryFriendlyByteBuf buf, UpdateWardPayload p) {
+                    buf.writeBlockPos(p.pos());
+                    buf.writeVarInt(p.chunkRadius());
+                    buf.writeDouble(p.damage());
+                    buf.writeVarInt(p.interval());
+                    buf.writeBoolean(p.announce());
+                    buf.writeBoolean(p.glowing());
+                    buf.writeBoolean(p.slow());
+                    buf.writeVarInt(p.slowAmplifier());
+                    buf.writeBoolean(p.enabled());
+                }
+            };
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -58,15 +75,12 @@ public record UpdateWardPayload(
             if (!(player.level() instanceof ServerLevel level)) return;
 
             BlockPos pos = p.pos();
-            // 防远程修改
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64.0) {
                 return;
             }
 
             BlockEntity be = level.getBlockEntity(pos);
-            if (!(be instanceof WardSourceBlockEntity ward)) {
-                return;
-            }
+            if (!(be instanceof WardSourceBlockEntity ward)) return;
 
             ward.applyAll(p.chunkRadius(), p.damage(), p.interval(),
                     p.announce(), p.glowing(), p.slow(), p.slowAmplifier(), p.enabled());
