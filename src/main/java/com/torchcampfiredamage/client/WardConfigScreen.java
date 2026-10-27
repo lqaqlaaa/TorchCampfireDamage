@@ -13,108 +13,175 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 守卫火源参数设置界面。
+ * 字段：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 /
+ *      目标发光 / 目标减速 / 击杀播报 / 传送掉落物 / 传送经验
  */
 public class WardConfigScreen extends Screen {
     private final BlockPos pos;
     private final WardSourceBlockEntity be;
 
-    private EditBox radiusBox;
+    private EditBox rangeBox;
     private EditBox damageBox;
     private EditBox intervalBox;
-    private EditBox ampBox;
 
-    private boolean announce;
+    private boolean enabled;
+    private boolean chunkMode;   // true = 区块, false = 方块
     private boolean glowing;
     private boolean slow;
-    private boolean enabled;
+    private boolean announce;
+    private boolean dropTeleport;
+    private boolean xpTeleport;
+
+    // 布局
+    private static final int ROW_H = 22;
+    private static final int LABEL_W = 76;
+    private static final int BOX_W = 88;
+    private static final int BTN_W = 78;
 
     public WardConfigScreen(BlockPos pos, WardSourceBlockEntity be) {
         super(Component.literal("守卫火源设置"));
         this.pos = pos;
         this.be = be;
-        this.announce = be.isAnnounce();
+        this.enabled = be.isEnabled();
+        this.chunkMode = be.isChunkMode();
         this.glowing = be.isGlowing();
         this.slow = be.isSlow();
-        this.enabled = be.isEnabled();
+        this.announce = be.isAnnounce();
+        this.dropTeleport = be.isTeleportDrops();
+        this.xpTeleport = be.isTeleportXp();
     }
 
     @Override
     protected void init() {
         int cx = this.width / 2;
-        int top = this.height / 2 - 100;
+        int left = cx - 160;
+        int right = cx + 10;
+        int top = this.height / 2 - 88;
+        int y = top;
 
-        // 区块范围
-        radiusBox = new EditBox(this.font, cx - 110, top, 70, 20, Component.literal("区块范围"));
-        radiusBox.setValue(String.valueOf(be.getChunkRadius()));
-        radiusBox.setTooltip(Tooltip.create(
-                Component.literal("0 = 1x1区块\n1 = 3x3区块\n2 = 5x5区块\n3 = 7x7区块\n4 = 9x9区块")));
-        addRenderableWidget(radiusBox);
+        // ---- 左列：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 ----
+        // 开关
+        addRenderableWidget(Button.builder(onOffText(enabled), b -> {
+            enabled = !enabled;
+            b.setMessage(onOffText(enabled));
+        }).bounds(left, y, BTN_W, 20).build());
+        y += ROW_H;
+
+        // 范围类型
+        addRenderableWidget(Button.builder(rangeTypeText(), b -> {
+            chunkMode = !chunkMode;
+            b.setMessage(rangeTypeText());
+            rangeBox.setValue(String.valueOf(convertRange()));
+        }).bounds(left, y, BTN_W, 20).build());
+        y += ROW_H;
+
+        // 伤害范围（数值框）
+        rangeBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害范围"));
+        rangeBox.setValue(String.valueOf(chunkMode ? be.getChunkRadius() : be.getBlockRadius()));
+        rangeBox.setTooltip(Tooltip.create(Component.literal(
+                "区块模式：0=1x1区块, 1=3x3, 2=5x5, 3=7x7, 4=9x9\n方块模式：格数半径")));
+        addRenderableWidget(rangeBox);
+        y += ROW_H;
 
         // 伤害
-        damageBox = new EditBox(this.font, cx - 110, top + 24, 70, 20, Component.literal("伤害"));
+        damageBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害"));
         damageBox.setValue(String.valueOf(be.getDamage()));
-        damageBox.setTooltip(Tooltip.create(
-                Component.literal("填 0 = 只发光/减速，不造成伤害\n无上限")));
+        damageBox.setTooltip(Tooltip.create(Component.literal("填 0 = 只发光/减速，不造成伤害\n无上限")));
         addRenderableWidget(damageBox);
+        y += ROW_H;
 
-        // 间隔
-        intervalBox = new EditBox(this.font, cx - 110, top + 48, 70, 20, Component.literal("间隔"));
+        // 伤害间隔
+        intervalBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害间隔"));
         intervalBox.setValue(String.valueOf(be.getInterval()));
-        intervalBox.setTooltip(Tooltip.create(
-                Component.literal("单位 tick\n20 = 1秒\n1 = 每tick")));
+        intervalBox.setTooltip(Tooltip.create(Component.literal("单位 tick\n20 = 1秒，1 = 每tick")));
         addRenderableWidget(intervalBox);
+        y += ROW_H;
 
-        // 减速等级
-        ampBox = new EditBox(this.font, cx - 110, top + 72, 70, 20, Component.literal("减速等级"));
-        ampBox.setValue(String.valueOf(be.getSlowAmplifier()));
-        ampBox.setTooltip(Tooltip.create(
-                Component.literal("0 = 缓慢I\n254 = 缓慢255")));
-        addRenderableWidget(ampBox);
-
-        // 开关
-        addRenderableWidget(Button.builder(announceText(), b -> {
-            announce = !announce;
-            b.setMessage(announceText());
-        }).bounds(cx + 10, top, 100, 20).build());
-
-        addRenderableWidget(Button.builder(glowText(), b -> {
+        // ---- 右列：目标发光 / 目标减速 / 击杀播报 / 传送掉落物 / 传送经验 ----
+        int ry = top;
+        addRenderableWidget(Button.builder(onOffText(glowing), b -> {
             glowing = !glowing;
-            b.setMessage(glowText());
-        }).bounds(cx + 10, top + 24, 100, 20).build());
+            b.setMessage(onOffText(glowing));
+        }).bounds(right, ry, BTN_W, 20).build());
+        ry += ROW_H;
 
-        addRenderableWidget(Button.builder(slowText(), b -> {
+        addRenderableWidget(Button.builder(onOffText(slow), b -> {
             slow = !slow;
-            b.setMessage(slowText());
-        }).bounds(cx + 10, top + 48, 100, 20).build());
+            b.setMessage(onOffText(slow));
+        }).bounds(right, ry, BTN_W, 20).build());
+        ry += ROW_H;
 
-        addRenderableWidget(Button.builder(enabledText(), b -> {
-            enabled = !enabled;
-            b.setMessage(enabledText());
-        }).bounds(cx + 10, top + 72, 100, 20).build());
+        addRenderableWidget(Button.builder(onOffText(announce), b -> {
+            announce = !announce;
+            b.setMessage(onOffText(announce));
+        }).bounds(right, ry, BTN_W, 20).build());
+        ry += ROW_H;
 
-        // 保存 / 取消
-        addRenderableWidget(Button.builder(Component.literal("✔ 保存"), b -> save())
-                .bounds(cx - 110, top + 108, 100, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("✘ 取消"), b -> onClose())
-                .bounds(cx + 10, top + 108, 100, 20).build());
+        addRenderableWidget(Button.builder(onOffText(dropTeleport), b -> {
+            dropTeleport = !dropTeleport;
+            b.setMessage(onOffText(dropTeleport));
+        }).bounds(right, ry, BTN_W, 20).build());
+        ry += ROW_H;
+
+        addRenderableWidget(Button.builder(onOffText(xpTeleport), b -> {
+            xpTeleport = !xpTeleport;
+            b.setMessage(onOffText(xpTeleport));
+        }).bounds(right, ry, BTN_W, 20).build());
+        ry += ROW_H;
+
+        // ---- 底部：保存 / 取消 ----
+        int by = top + ROW_H * 5 + 12;
+        addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
+                .bounds(cx - 88, by, 86, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
+                .bounds(cx + 2, by, 86, 20).build());
+
+        this._left = left;
+        this._right = right;
+        this._top = top;
     }
 
-    private Component announceText() { return Component.literal("播报击杀: " + (announce ? "§a开" : "§c关")); }
-    private Component glowText()    { return Component.literal("目标发光: " + (glowing ? "§a开" : "§c关")); }
-    private Component slowText()    { return Component.literal("目标减速: " + (slow ? "§a开" : "§c关")); }
-    private Component enabledText() { return Component.literal("整体生效: " + (enabled ? "§a开" : "§c关")); }
+    private int _left;
+    private int _right;
+    private int _top;
+
+    private Component toggleText(String name, boolean on) {
+        return Component.literal(name + ": " + (on ? "开" : "关"));
+    }
+
+    private Component onOffText(boolean on) {
+        return Component.literal(on ? "开" : "关");
+    }
+
+    private Component rangeTypeText() {
+        return Component.literal("范围类型: " + (chunkMode ? "区块" : "方块"));
+    }
+
+    /** 在区块/方块之间切换时，尽量保持范围可比 */
+    private int convertRange() {
+        if (chunkMode) {
+            // 从方块切到区块：格数 → 区块数（向上取整）
+            int blocks = be.getBlockRadius();
+            return Math.max(0, Math.min(4, (blocks + 8) / 16));
+        } else {
+            // 从区块切到方块：区块数 → 格数
+            int chunks = be.getChunkRadius();
+            return Math.max(0, Math.min(64, chunks * 16));
+        }
+    }
 
     private void save() {
-        int radius = parseInt(radiusBox.getValue(), 1, 0, 4);
+        int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
+                chunkMode ? 0 : 0, chunkMode ? 4 : 128);
         double damage = parseDouble(damageBox.getValue(), 2.0);
         int interval = parseInt(intervalBox.getValue(), 20, 1, Integer.MAX_VALUE);
-        int amp = parseInt(ampBox.getValue(), 254, 0, 254);
 
         PacketDistributor.sendToServer(new UpdateWardPayload(
-                pos, radius, damage, interval, announce, glowing, slow, amp, enabled));
+                pos, enabled, chunkMode, range, damage, interval,
+                glowing, slow, announce, dropTeleport, xpTeleport));
 
-        // 本地立即更新，界面即刻反映
-        be.applyAll(radius, damage, interval, announce, glowing, slow, amp, enabled);
+        be.applyAll(enabled, chunkMode, range, damage, interval,
+                glowing, slow, announce, dropTeleport, xpTeleport);
         onClose();
     }
 
@@ -139,17 +206,20 @@ public class WardConfigScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int cx = this.width / 2;
-        int top = this.height / 2 - 100;
+        gg.drawCenteredString(this.font, "守卫火源设置", this.width / 2, _top - 24, 0xFFD700);
+        gg.drawString(this.font,
+                "坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
+                _left, _top - 10, 0xAAAAAA);
 
-        gg.drawCenteredString(this.font, "§6✦ 守卫火源设置 ✦", cx, top - 26, 0xFFFFFF);
-        gg.drawString(this.font, "§7坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
-                cx - 110, top - 12, 0xAAAAAA);
-
-        gg.drawString(this.font, "§f区块范围", cx - 190, top + 6, 0xFFFFFF);
-        gg.drawString(this.font, "§f伤害", cx - 190, top + 30, 0xFFFFFF);
-        gg.drawString(this.font, "§f间隔(tick)", cx - 190, top + 54, 0xFFFFFF);
-        gg.drawString(this.font, "§f减速等级", cx - 190, top + 78, 0xFFFFFF);
+        // 左列标签
+        String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔"};
+        for (int i = 0; i < leftLabels.length; i++) {
+            gg.drawString(this.font, leftLabels[i], _left - 56, _top + i * ROW_H + 6, 0xFFFFFF);
+        }
+        String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验"};
+        for (int i = 0; i < rightLabels.length; i++) {
+            gg.drawString(this.font, rightLabels[i], _right - 56, _top + i * ROW_H + 6, 0xFFFFFF);
+        }
     }
 
     @Override
