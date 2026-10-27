@@ -43,10 +43,8 @@ public class DamageEventHandler {
     private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
     /** 生物UUID -> 掉落物/经验应传送到的火源位置 */
     private static final Map<UUID, BlockPos> entityDropTargets = new HashMap<>();
-    /** 发光中的生物 UUID -> 到期游戏时间 */
-    private static final Map<UUID, Long> GLOW_EXPIRY = new HashMap<>();
-    /** 需要检查发光过期的 UUID 集合 */
-    private static final Set<UUID> GLOW_TRACKED = new HashSet<>();
+    /** 发光中的生物 -> 到期游戏时间 */
+    private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
 
     /* ============ 火源判定 ============ */
 
@@ -247,9 +245,8 @@ public class DamageEventHandler {
     private static void applyHitEffects(Mob mob) {
         if (ModConfig.GLOW_HIT_TARGETS.get()) {
             mob.setGlowingTag(true);
-            // 用自定义计时器控制发光结束
-            GLOW_EXPIRY.put(mob.getUUID(), mob.level().getGameTime() + ModConfig.GLOW_DURATION.get());
-            GLOW_TRACKED.add(mob.getUUID());
+            // 用自定义计时器控制发光结束（弱引用，生物被移除后自动回收）
+            GLOW_EXPIRY.put(mob, mob.level().getGameTime() + ModConfig.GLOW_DURATION.get());
         }
 
         if (ModConfig.SLOW_HIT_TARGETS.get()) {
@@ -266,19 +263,21 @@ public class DamageEventHandler {
 
     /** 检查并移除已过期的发光标记 */
     public static void tickGlowExpiry(Level level) {
-        if (GLOW_TRACKED.isEmpty()) {
+        if (GLOW_EXPIRY.isEmpty()) {
             return;
         }
         long now = level.getGameTime();
-        Iterator<UUID> it = GLOW_TRACKED.iterator();
+        Iterator<Map.Entry<Mob, Long>> it = GLOW_EXPIRY.entrySet().iterator();
         while (it.hasNext()) {
-            UUID id = it.next();
-            Long expiry = GLOW_EXPIRY.get(id);
-            if (expiry == null || now >= expiry) {
-                if (level.getEntity(id) instanceof Mob mob) {
-                    mob.setGlowingTag(false);
-                }
-                GLOW_EXPIRY.remove(id);
+            Map.Entry<Mob, Long> entry = it.next();
+            Mob mob = entry.getKey();
+            // 生物已失效：直接丢弃
+            if (mob == null || !mob.isAlive() || mob.level() != level) {
+                it.remove();
+                continue;
+            }
+            if (now >= entry.getValue()) {
+                mob.setGlowingTag(false);
                 it.remove();
             }
         }
@@ -386,17 +385,15 @@ public class DamageEventHandler {
     }
 
     /* ============ 清理 ============ */
-
-    /**
-     * 生物死亡后清掉传送标记，避免 UUID 长期驻留内存。
-     * LivingDropsEvent 与 LivingExperienceDropEvent 都会读取它，
-     * 所以只在两者都跑完后清理——这里用 LivingDeathEvent 之后的一 tick 清理更稳妥，
-     * 但简单起见依赖 Drops/XP 事件本身的读取，然后由 tick 定期扫除不存在实体的记录。
-     */
-    public static void cleanupTargets(ServerLevel level) {
+    /** 定期清理已不存在的传送目标记录，避免 UUID 长期驻留内存 */
+    public static void cleanupTargets(ServerLevel level, Collection<LivingEntity> aliveEntities) {
         if (entityDropTargets.isEmpty()) {
             return;
         }
-        entityDropTargets.entrySet().removeIf(e -> level.getEntity(e.getKey()) == null);
+        Set<UUID> alive = new HashSet<>();
+        for (LivingEntity e : aliveEntities) {
+            alive.add(e.getUUID());
+        }
+        entityDropTargets.keySet().removeIf(id -> !alive.contains(id));
     }
 }
