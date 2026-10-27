@@ -21,7 +21,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.CampfireBlock;
+import com.torchcampfiredamage.block.WardCampfireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -136,9 +136,9 @@ public class DamageEventHandler {
 
                 // 篝火需要点燃
                 BlockState state = level.getBlockState(ip);
-                if (state.getBlock() instanceof CampfireBlock
-                        && state.hasProperty(CampfireBlock.LIT)
-                        && !state.getValue(CampfireBlock.LIT)) {
+                if (state.getBlock() instanceof WardCampfireBlock
+                        && state.hasProperty(WardCampfireBlock.LIT)
+                        && !state.getValue(WardCampfireBlock.LIT)) {
                     continue;
                 }
 
@@ -260,7 +260,7 @@ public class DamageEventHandler {
 
         String coord = String.format("(%d, %d, %d)", sourcePos.getX(), sourcePos.getY(), sourcePos.getZ());
         BlockState st = level.getBlockState(sourcePos);
-        String sourceName = (st.getBlock() instanceof CampfireBlock) ? "守卫篝火" : "守卫火把";
+        String sourceName = (st.getBlock() instanceof WardCampfireBlock) ? "守卫篝火" : "守卫火把";
 
         Component msg = Component.empty()
                 .append(Component.literal("🔥 [" + sourceName + " " + coord + "] ").withStyle(ChatFormatting.GOLD))
