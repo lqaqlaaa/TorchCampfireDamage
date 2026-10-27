@@ -33,32 +33,30 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import java.util.*;
 
 /**
- * 伤害处理器 —— 性能优化版。
+ * 伤害处理器 —— 索引登记模式（性能友好）。
  * <p>
- * 关键：不再扫描方块空间找火把，而是由 BlockEntity 自行登记到本维度的索引表中。
- * tick 时只遍历「已登记的少量火把」，无论玩家周围有多少方块，开销都与火把数量成正比。
+ * 由 BlockEntity 在加载/卸载时调用 register/unregister，
+ * tick 时只遍历已登记的火把，与地图大小无关。
  */
 public class DamageEventHandler {
-    /** 每 5 tick 处理一次伤害（可配置） */
     private static final int SCAN_STEP = 2;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
 
-    /** 维度 -> 已登记火把位置集合 */
     private static final Map<Level, Set<BlockPos>> REGISTERED = new WeakHashMap<>();
-    /** 火把位置 -> 上次伤害时间 */
     private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new WeakHashMap<>();
-    /** 火把位置 -> 归属玩家UUID */
     private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
-    /** 生物UUID -> 传送目标 */
-    private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
-    /** 发光中的生物 -> 到期时间 */
-    private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
 
+    /** 生物UUID -> 传送目标（掉落物 / 经验） */
+    private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
+    /** 已死亡、待清理的标记（延迟一 tick 清理，确保两个事件都跑完） */
+    private static final Map<UUID, Integer> pendingCleanup = new HashMap<>();
+
+    private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
     private static boolean DEBUG_PRINTED = false;
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
 
-    /* ================= 登记接口（由 BlockEntity 调用） ================= */
+    /* ================= 登记接口 ================= */
 
     public static void register(Level level, BlockPos pos) {
         if (level.isClientSide()) return;
@@ -77,7 +75,7 @@ public class DamageEventHandler {
 
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
-        System.out.println("[TorchCampfireDamage] Server started. Ward torches ready (indexed mode).");
+        System.out.println("[TorchCampfireDamage] Server started. Ward torches ready (indexed).");
     }
 
     private static <T> T safeGet(java.util.function.Supplier<T> supplier, T def) {
@@ -99,7 +97,8 @@ public class DamageEventHandler {
             double maxX = (double) (cx + r + 1) * CHUNK_SIZE;
             double minZ = (double) (cz - r) * CHUNK_SIZE;
             double maxZ = (double) (cz + r + 1) * CHUNK_SIZE;
-            return new AABB(minX, -1.0e9, minZ, maxX, 1.0e9, maxZ);
+            // Y 轴限制在本维度合理范围，避免 AABB 过大导致实体查询扫全图
+            return new AABB(minX, center.getY() - 256, minZ, maxX, center.getY() + 256, maxZ);
         } else {
             double r = ward.getBlockRadius() + 0.5;
             return AABB.ofSize(Vec3.atCenterOf(center), r * 2, r * 2, r * 2);
@@ -135,12 +134,12 @@ public class DamageEventHandler {
     }
 
     private static void handle(ServerLevel level) {
-        // 发光过期检查每 tick 执行（几乎零成本）
         tickGlowExpiry(level);
+        cleanPending(level);
 
         Set<BlockPos> torches = REGISTERED.get(level);
         if (torches == null || torches.isEmpty()) {
-            return;   // 没有火把 → 立即返回，零开销
+            return;
         }
 
         long gameTime = level.getGameTime();
@@ -157,22 +156,18 @@ public class DamageEventHandler {
         Map<BlockPos, UUID> owners = positionOwners.computeIfAbsent(level, k -> new HashMap<>());
 
         Set<UUID> damagedThisTick = new HashSet<>();
-        // 遍历副本，避免 removeIf 时的并发修改
         List<BlockPos> snapshot = new ArrayList<>(torches);
-
-        // 只处理「附近有玩家」的火把（避免加载远处区块实体）
         List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
             BlockEntity be = level.getBlockEntity(ip);
             if (!(be instanceof WardSourceBlockEntity ward)) {
-                // 方块已被移除 → 从索引中清除
                 unregister(level, ip);
                 continue;
             }
             if (!ward.isEnabled()) continue;
 
-            // 找最近的玩家；若附近没有玩家则不处理（省性能）
+            // 找最近玩家
             Player nearest = null;
             double nearestSq = Double.MAX_VALUE;
             for (Player p : players) {
@@ -184,11 +179,10 @@ public class DamageEventHandler {
             }
             if (nearest == null) continue;
 
-            // 距离超过「最大影响范围 + 128」就跳过
-            int maxRangeBlocks = (ward.isChunkMode() ? (ward.getChunkRadius() + 1) * 16 : ward.getBlockRadius() + 16);
-            if (nearestSq > (double) (maxRangeBlocks + 128) * (maxRangeBlocks + 128)) {
-                continue;
-            }
+            int maxRange = (ward.isChunkMode() ? (ward.getChunkRadius() + 1) * 16 : ward.getBlockRadius() + 16);
+            double limit = (double) (maxRange + 128) * (maxRange + 128);
+            if (nearestSq > limit) continue;
+
             owners.put(ip, nearest.getUUID());
 
             int interval = Math.max(1, ward.getInterval());
@@ -222,6 +216,7 @@ public class DamageEventHandler {
             if (ignoreNamed && mob.hasCustomName()) continue;
             if (!isHostileToPlayers(mob)) continue;
 
+            // 附加效果
             if (glowing) {
                 mob.setGlowingTag(true);
                 GLOW_EXPIRY.put(mob, level.getGameTime() + safeGet(ModConfig.GLOW_DURATION::get, 100));
@@ -243,12 +238,14 @@ public class DamageEventHandler {
                     ? level.damageSources().playerAttack(owner)
                     : level.damageSources().magic();
 
+            // 先登记传送目标，再打伤害
             if (tpDrops || tpXp) {
                 entityDropTargets.put(mob.getUUID(), new DropTarget(center, tpDrops, tpXp));
             }
 
             boolean hurtOk = mob.hurt(src, damage);
             if (!hurtOk) {
+                // 强制扣血（穿透无敌帧 / 免疫）
                 mob.invulnerableTime = 0;
                 float nh = mob.getHealth() - damage;
                 mob.setHealth(Math.max(0.0f, nh));
@@ -259,10 +256,31 @@ public class DamageEventHandler {
 
             damagedThisTick.add(mob.getUUID());
 
-            if (mob.isAlive()) {
+            if (!mob.isAlive()) {
+                if (announce) {
+                    announceKill(level, center, mob);
+                }
+                // 延迟清理：让 LivingDropsEvent / LivingExperienceDropEvent 有机会读取
+                pendingCleanup.put(mob.getUUID(), 80);
+            } else {
+                // 活着 → 撤销传送标记
                 entityDropTargets.remove(mob.getUUID());
-            } else if (announce) {
-                announceKill(level, center, mob);
+            }
+        }
+    }
+
+    /** 每 tick 递减待清理计数器，超时后强制清除残留标记 */
+    private static void cleanPending(ServerLevel level) {
+        if (pendingCleanup.isEmpty()) return;
+        Iterator<Map.Entry<UUID, Integer>> it = pendingCleanup.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Integer> e = it.next();
+            int left = e.getValue() - 1;
+            if (left <= 0) {
+                entityDropTargets.remove(e.getKey());
+                it.remove();
+            } else {
+                e.setValue(left);
             }
         }
     }
@@ -309,7 +327,7 @@ public class DamageEventHandler {
         }
     }
 
-    /* ================= 掉落物 ================= */
+    /* ================= 掉落物传送 ================= */
 
     @SubscribeEvent
     public void onLivingDrops(LivingDropsEvent event) {
@@ -327,7 +345,7 @@ public class DamageEventHandler {
         }
     }
 
-    /* ================= 经验 ================= */
+    /* ================= 经验传送 ================= */
 
     @SubscribeEvent
     public void onExperienceDrop(LivingExperienceDropEvent event) {
@@ -335,7 +353,7 @@ public class DamageEventHandler {
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        DropTarget target = entityDropTargets.remove(entity.getUUID());
+        DropTarget target = entityDropTargets.get(entity.getUUID());
         if (target == null || !target.xp()) return;
         if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
 
