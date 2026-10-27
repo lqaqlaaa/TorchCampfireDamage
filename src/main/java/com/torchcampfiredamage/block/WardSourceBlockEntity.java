@@ -3,24 +3,25 @@ package com.torchcampfiredamage.block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.CampfireBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * 守卫火源 BlockEntity —— 所有参数都存在方块自身，跟着方块走。
+ * 守卫火源 BlockEntity。
+ * <p>
+ * 继承 CampfireBlockEntity —— 因此守卫篝火直接获得原版烹饪能力
+ * （4 个物品槽、烤制进度、上火/熄灭的光照联动）。
+ * 火把不使用这些槽位，无副作用。
+ * <p>
+ * 另外保存每方块独立的伤害参数。
  */
-public class WardSourceBlockEntity extends BlockEntity {
+public class WardSourceBlockEntity extends CampfireBlockEntity {
 
     private boolean enabled = true;
     /** true = 区块模式, false = 方块模式 */
     private boolean chunkMode = true;
-    /** 区块模式下的区块半径（0~4） */
     private int chunkRadius = 1;
-    /** 方块模式下的格数半径 */
     private int blockRadius = 16;
     private double damage = 2.0;
     private int interval = 20;
@@ -53,13 +54,6 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isTeleportDrops() { return teleportDrops; }
     public boolean isTeleportXp() { return teleportXp; }
 
-    /** 当前生效的「区块半径」——方块模式下换算成等效区块数 */
-    public int effectiveChunkRadius() {
-        if (chunkMode) return chunkRadius;
-        // 格数半径 → 区块半径（向上取整）
-        return Math.max(0, (blockRadius + 15) / 16);
-    }
-
     /** 一次性写入全部参数 */
     public void applyAll(boolean enabled, boolean chunkMode, int range, double damage, int interval,
                          boolean glowing, boolean slow, boolean announce,
@@ -87,50 +81,36 @@ public class WardSourceBlockEntity extends BlockEntity {
     /* ===== 存储 ===== */
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        tag.putBoolean("enabled", enabled);
-        tag.putBoolean("chunkMode", chunkMode);
-        tag.putInt("chunkRadius", chunkRadius);
-        tag.putInt("blockRadius", blockRadius);
-        tag.putDouble("damage", damage);
-        tag.putInt("interval", interval);
-        tag.putBoolean("glowing", glowing);
-        tag.putBoolean("slow", slow);
-        tag.putInt("slowAmplifier", slowAmplifier);
-        tag.putBoolean("announce", announce);
-        tag.putBoolean("teleportDrops", teleportDrops);
-        tag.putBoolean("teleportXp", teleportXp);
+    public void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);       // 烹饪槽位
+        tag.putBoolean("W_enabled", enabled);
+        tag.putBoolean("W_chunkMode", chunkMode);
+        tag.putInt("W_chunkRadius", chunkRadius);
+        tag.putInt("W_blockRadius", blockRadius);
+        tag.putDouble("W_damage", damage);
+        tag.putInt("W_interval", interval);
+        tag.putBoolean("W_glowing", glowing);
+        tag.putBoolean("W_slow", slow);
+        tag.putInt("W_slowAmplifier", slowAmplifier);
+        tag.putBoolean("W_announce", announce);
+        tag.putBoolean("W_dropTp", teleportDrops);
+        tag.putBoolean("W_xpTp", teleportXp);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        if (tag.contains("enabled")) enabled = tag.getBoolean("enabled");
-        if (tag.contains("chunkMode")) chunkMode = tag.getBoolean("chunkMode");
-        if (tag.contains("chunkRadius")) chunkRadius = tag.getInt("chunkRadius");
-        if (tag.contains("blockRadius")) blockRadius = tag.getInt("blockRadius");
-        if (tag.contains("damage")) damage = tag.getDouble("damage");
-        if (tag.contains("interval")) interval = tag.getInt("interval");
-        if (tag.contains("glowing")) glowing = tag.getBoolean("glowing");
-        if (tag.contains("slow")) slow = tag.getBoolean("slow");
-        if (tag.contains("slowAmplifier")) slowAmplifier = tag.getInt("slowAmplifier");
-        if (tag.contains("announce")) announce = tag.getBoolean("announce");
-        if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
-        if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
-    }
-
-    /* ===== 客户端同步 ===== */
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        CompoundTag tag = new CompoundTag();
-        saveAdditional(tag, registries);
-        return tag;
-    }
-
-    @Override
-    public Packet<ClientGamePacketListener> getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
+    public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);       // 烹饪槽位
+        if (tag.contains("W_enabled")) enabled = tag.getBoolean("W_enabled");
+        if (tag.contains("W_chunkMode")) chunkMode = tag.getBoolean("W_chunkMode");
+        if (tag.contains("W_chunkRadius")) chunkRadius = tag.getInt("W_chunkRadius");
+        if (tag.contains("W_blockRadius")) blockRadius = tag.getInt("W_blockRadius");
+        if (tag.contains("W_damage")) damage = tag.getDouble("W_damage");
+        if (tag.contains("W_interval")) interval = tag.getInt("W_interval");
+        if (tag.contains("W_glowing")) glowing = tag.getBoolean("W_glowing");
+        if (tag.contains("W_slow")) slow = tag.getBoolean("W_slow");
+        if (tag.contains("W_slowAmplifier")) slowAmplifier = tag.getInt("W_slowAmplifier");
+        if (tag.contains("W_announce")) announce = tag.getBoolean("W_announce");
+        if (tag.contains("W_dropTp")) teleportDrops = tag.getBoolean("W_dropTp");
+        if (tag.contains("W_xpTp")) teleportXp = tag.getBoolean("W_xpTp");
     }
 }
