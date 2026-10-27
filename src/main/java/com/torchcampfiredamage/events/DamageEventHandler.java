@@ -1,5 +1,6 @@
 package com.torchcampfiredamage.events;
 
+import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -20,8 +21,8 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -36,25 +37,20 @@ import java.util.*;
 public class DamageEventHandler {
     private static final int SCAN_STEP = 5;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
+    /** 最大搜索半径：9x9 区块 → 5 区块半径 */
+    private static final int MAX_SEARCH_CHUNKS = 4;
 
     private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new WeakHashMap<>();
     private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
     private static final Map<UUID, BlockPos> entityDropTargets = new HashMap<>();
     private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
 
-    /** 配置是否可用（避免未加载时异常导致整个 handler 失效） */
-    private static volatile boolean configReady = false;
-    /** 诊断日志只打印一次 */
     private static boolean DEBUG_PRINTED = false;
 
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
-        // 服务端启动完成时配置一定已加载
-        configReady = true;
-        System.out.println("[TorchCampfireDamage] Mod loaded, config ready.");
+        System.out.println("[TorchCampfireDamage] Server started. Ward blocks registered.");
     }
-
-    /* ================= 配置安全读取 ================= */
 
     private static <T> T safeGet(java.util.function.Supplier<T> supplier, T def) {
         try {
@@ -64,36 +60,15 @@ public class DamageEventHandler {
         }
     }
 
-    /* ================= 火源判定 ================= */
-
-    private static boolean isSourceBlock(BlockState state) {
-        if (state.isAir()) return false;
-        if (state.getBlock() == Blocks.CAMPFIRE && safeGet(ModConfig.ENABLE_CAMPFIRE::get, true)) return true;
-        if (state.getBlock() == Blocks.SOUL_CAMPFIRE && safeGet(ModConfig.ENABLE_SOUL_CAMPFIRE::get, true)) return true;
-        if (state.getBlock() == Blocks.TORCH && safeGet(ModConfig.ENABLE_TORCH::get, true)) return true;
-        if (state.getBlock() == Blocks.SOUL_TORCH && safeGet(ModConfig.ENABLE_SOUL_TORCH::get, true)) return true;
-        if (state.getBlock() == Blocks.WALL_TORCH && safeGet(ModConfig.ENABLE_TORCH::get, true)) return true;
-        if (state.getBlock() == Blocks.SOUL_WALL_TORCH && safeGet(ModConfig.ENABLE_SOUL_TORCH::get, true)) return true;
-        return false;
-    }
-
-    private static boolean isLitSource(BlockState state) {
-        if (!isSourceBlock(state)) return false;
-        if (state.getBlock() instanceof CampfireBlock) {
-            return state.hasProperty(CampfireBlock.LIT) && state.getValue(CampfireBlock.LIT);
-        }
-        return true;
-    }
-
-    /* ================= 区块区域 ================= */
+    /* ================= 区域 ================= */
 
     private static AABB chunkAABB(BlockPos pos, int chunkRadius) {
-        int chunkX = SectionPos.blockToSectionCoord(pos.getX());
-        int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        double minX = (double) (chunkX - chunkRadius) * CHUNK_SIZE;
-        double maxX = (double) (chunkX + chunkRadius + 1) * CHUNK_SIZE;
-        double minZ = (double) (chunkZ - chunkRadius) * CHUNK_SIZE;
-        double maxZ = (double) (chunkZ + chunkRadius + 1) * CHUNK_SIZE;
+        int cx = SectionPos.blockToSectionCoord(pos.getX());
+        int cz = SectionPos.blockToSectionCoord(pos.getZ());
+        double minX = (double) (cx - chunkRadius) * CHUNK_SIZE;
+        double maxX = (double) (cx + chunkRadius + 1) * CHUNK_SIZE;
+        double minZ = (double) (cz - chunkRadius) * CHUNK_SIZE;
+        double maxZ = (double) (cz + chunkRadius + 1) * CHUNK_SIZE;
         return new AABB(minX, -1.0e9, minZ, maxX, 1.0e9, maxZ);
     }
 
@@ -120,7 +95,6 @@ public class DamageEventHandler {
         try {
             handle(serverLevel);
         } catch (Throwable t) {
-            // 避免异常传播导致整个事件总线静默失败
             System.out.println("[TorchCampfireDamage] tick error: " + t);
             t.printStackTrace();
         }
@@ -128,26 +102,18 @@ public class DamageEventHandler {
 
     private static void handle(ServerLevel level) {
         long gameTime = level.getGameTime();
-
-        // 发光过期检查每 tick 执行
         tickGlowExpiry(level);
 
         if (gameTime % SCAN_STEP != 0) {
             return;
         }
 
-        int chunkRadius = safeGet(ModConfig.CHUNK_RADIUS::get, 1);
-        double damageAmount = safeGet(ModConfig.DAMAGE_AMOUNT::get, 2.0);
-        int interval = Math.max(1, safeGet(ModConfig.DAMAGE_INTERVAL::get, 20));
-        int searchBlocks = (chunkRadius + 1) * CHUNK_SIZE;
-
-        // 首次诊断日志（只打印一次）
         if (!DEBUG_PRINTED) {
             DEBUG_PRINTED = true;
-            System.out.println("[TorchCampfireDamage] DEBUG tick running: chunkRadius=" + chunkRadius
-                    + " damage=" + damageAmount + " interval=" + interval
-                    + " players=" + level.players().size());
+            System.out.println("[TorchCampfireDamage] DEBUG tick running. players=" + level.players().size());
         }
+
+        int searchBlocks = (MAX_SEARCH_CHUNKS + 1) * CHUNK_SIZE;
 
         Map<BlockPos, Long> damageTimes = lastDamageTimes.computeIfAbsent(level, k -> new HashMap<>());
         Map<BlockPos, UUID> owners = positionOwners.computeIfAbsent(level, k -> new HashMap<>());
@@ -163,9 +129,28 @@ public class DamageEventHandler {
 
                 BlockPos ip = pos.immutable();
                 if (activePositions.contains(ip)) continue;
-                if (!isLitSource(level.getBlockState(ip))) continue;
+
+                BlockEntity be = level.getBlockEntity(ip);
+                if (!(be instanceof WardSourceBlockEntity ward)) continue;
+                if (!ward.isEnabled()) continue;
+
+                // 篝火需要点燃
+                BlockState state = level.getBlockState(ip);
+                if (state.getBlock() instanceof CampfireBlock
+                        && state.hasProperty(CampfireBlock.LIT)
+                        && !state.getValue(CampfireBlock.LIT)) {
+                    continue;
+                }
 
                 activePositions.add(ip);
+
+                int chunkRadius = ward.getChunkRadius();
+                double damage = ward.getDamage();
+                int interval = Math.max(1, ward.getInterval());
+                boolean announce = ward.isAnnounce();
+                boolean glowing = ward.isGlowing();
+                boolean slow = ward.isSlow();
+                int slowAmp = ward.getSlowAmplifier();
 
                 // 归属最近玩家
                 UUID cur = owners.get(ip);
@@ -178,19 +163,22 @@ public class DamageEventHandler {
                 long last = damageTimes.getOrDefault(ip, Long.MIN_VALUE / 2);
                 if (gameTime - last < interval) continue;
 
-                damageHostiles(level, ip, chunkRadius, (float) damageAmount, owners.get(ip), damagedThisTick);
+                damageHostiles(level, ip, chunkRadius, (float) damage, owners.get(ip),
+                        damagedThisTick, announce, glowing, slow, slowAmp);
                 damageTimes.put(ip, gameTime);
             }
         }
 
-        damageTimes.keySet().removeIf(p -> !isLitSource(level.getBlockState(p)));
-        owners.keySet().removeIf(p -> !isLitSource(level.getBlockState(p)));
+        // 清理失效位置
+        damageTimes.keySet().removeIf(p -> !(level.getBlockEntity(p) instanceof WardSourceBlockEntity));
+        owners.keySet().removeIf(p -> !(level.getBlockEntity(p) instanceof WardSourceBlockEntity));
     }
 
-    /* ================= 伤害 ================= */
+    /* ================= 伤害（含强制扣血） ================= */
 
     private static void damageHostiles(ServerLevel level, BlockPos center, int chunkRadius,
-                                       float damage, UUID ownerUUID, Set<UUID> damagedThisTick) {
+                                       float damage, UUID ownerUUID, Set<UUID> damagedThisTick,
+                                       boolean announce, boolean glowing, boolean slow, int slowAmp) {
         AABB area = chunkAABB(center, chunkRadius);
         Player owner = ownerUUID == null ? null : level.getPlayerByUUID(ownerUUID);
         boolean countAsKill = safeGet(ModConfig.COUNT_AS_PLAYER_KILL::get, true);
@@ -202,6 +190,21 @@ public class DamageEventHandler {
             if (ignoreNamed && mob.hasCustomName()) continue;
             if (!isHostileToPlayers(mob)) continue;
 
+            // 标记/减速（伤害为 0 时也生效）
+            if (glowing) {
+                mob.setGlowingTag(true);
+                GLOW_EXPIRY.put(mob, level.getGameTime() + safeGet(ModConfig.GLOW_DURATION::get, 100));
+            }
+            if (slow) {
+                mob.addEffect(new MobEffectInstance(
+                        MobEffects.MOVEMENT_SLOWDOWN,
+                        Math.max(1, safeGet(ModConfig.SLOW_DURATION::get, 100)),
+                        Math.min(254, Math.max(0, slowAmp)),
+                        false, false, true));
+            }
+
+            if (damage <= 0) continue;
+
             DamageSource src = (countAsKill && owner != null)
                     ? level.damageSources().playerAttack(owner)
                     : level.damageSources().magic();
@@ -210,33 +213,25 @@ public class DamageEventHandler {
                 entityDropTargets.put(mob.getUUID(), center);
             }
 
-            applyHitEffects(mob);
+            boolean hurtOk = mob.hurt(src, damage);
 
-            mob.hurt(src, damage);
+            // 强制扣血：未造成伤害 或 血量没变化（被无敌帧/免疫/抗性挡下）
+            if (!hurtOk) {
+                mob.invulnerableTime = 0;
+                float nh = mob.getHealth() - damage;
+                mob.setHealth(Math.max(0.0f, nh));
+                if (mob.getHealth() <= 0.0f) {
+                    mob.die(src);
+                }
+            }
+
             damagedThisTick.add(mob.getUUID());
 
             if (mob.isAlive()) {
                 entityDropTargets.remove(mob.getUUID());
-            } else {
+            } else if (announce) {
                 announceKill(level, center, mob);
             }
-        }
-    }
-
-    /* ================= 命中效果 ================= */
-
-    private static void applyHitEffects(Mob mob) {
-        if (safeGet(ModConfig.GLOW_HIT_TARGETS::get, false)) {
-            mob.setGlowingTag(true);
-            GLOW_EXPIRY.put(mob, mob.level().getGameTime()
-                    + safeGet(ModConfig.GLOW_DURATION::get, 100));
-        }
-        if (safeGet(ModConfig.SLOW_HIT_TARGETS::get, false)) {
-            mob.addEffect(new MobEffectInstance(
-                    MobEffects.MOVEMENT_SLOWDOWN,
-                    Math.max(1, safeGet(ModConfig.SLOW_DURATION::get, 100)),
-                    Math.min(254, Math.max(0, safeGet(ModConfig.SLOW_AMPLIFIER::get, 254))),
-                    false, false, true));
         }
     }
 
@@ -261,10 +256,11 @@ public class DamageEventHandler {
     /* ================= 播报 ================= */
 
     private static void announceKill(ServerLevel level, BlockPos sourcePos, Mob mob) {
-        if (!safeGet(ModConfig.ANNOUNCE_KILLS::get, true)) return;
+        if (!safeGet(ModConfig.GLOBAL_ANNOUNCE_ENABLED::get, true)) return;
 
         String coord = String.format("(%d, %d, %d)", sourcePos.getX(), sourcePos.getY(), sourcePos.getZ());
-        String sourceName = isTorchLike(level.getBlockState(sourcePos)) ? "火把" : "篝火";
+        BlockState st = level.getBlockState(sourcePos);
+        String sourceName = (st.getBlock() instanceof CampfireBlock) ? "守卫篝火" : "守卫火把";
 
         Component msg = Component.empty()
                 .append(Component.literal("🔥 [" + sourceName + " " + coord + "] ").withStyle(ChatFormatting.GOLD))
@@ -282,13 +278,6 @@ public class DamageEventHandler {
         }
     }
 
-    private static boolean isTorchLike(BlockState state) {
-        return state.getBlock() == Blocks.TORCH
-                || state.getBlock() == Blocks.SOUL_TORCH
-                || state.getBlock() == Blocks.WALL_TORCH
-                || state.getBlock() == Blocks.SOUL_WALL_TORCH;
-    }
-
     /* ================= 掉落物 ================= */
 
     @SubscribeEvent
@@ -299,7 +288,7 @@ public class DamageEventHandler {
 
         BlockPos target = entityDropTargets.get(entity.getUUID());
         if (target == null) return;
-        if (!isLitSource(level.getBlockState(target))) return;
+        if (!(level.getBlockEntity(target) instanceof WardSourceBlockEntity)) return;
 
         for (ItemEntity item : event.getDrops()) {
             item.setPos(target.getX() + 0.5, target.getY() + 1.0, target.getZ() + 0.5);
@@ -318,7 +307,7 @@ public class DamageEventHandler {
         BlockPos target = entityDropTargets.get(entity.getUUID());
         if (target == null) return;
         if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
-        if (!isLitSource(level.getBlockState(target))) return;
+        if (!(level.getBlockEntity(target) instanceof WardSourceBlockEntity)) return;
 
         int xp = event.getDroppedExperience();
         if (xp <= 0) return;
