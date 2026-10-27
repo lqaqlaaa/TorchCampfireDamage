@@ -42,30 +42,16 @@ public class ModBlocks {
                     .instabreak()
                     .lightLevel(s -> 14)
                     .sound(SoundType.WOOD)
-                    .pushReaction(PushReaction.DESTROY)
-                    ));
-
-    /** 守卫篝火（原版 CampfireBlock 特性：烹饪/点火/水灭/灼烧） */
-    public static final DeferredBlock<Block> WARD_CAMPFIRE = BLOCKS.register("ward_campfire",
-            () -> new WardCampfireBlock(BlockBehaviour.Properties.of()
-                    .mapColor(MapColor.WOOD)
-                    .strength(2.0f)
-                    .lightLevel(s -> 15)
-                    .sound(SoundType.WOOD)
-                    .noOcclusion()
                     .pushReaction(PushReaction.DESTROY)));
 
     public static final DeferredItem<Item> WARD_TORCH_ITEM = ITEMS.register("ward_torch",
             () -> new BlockItem(WARD_TORCH.get(), new Item.Properties()));
 
-    public static final DeferredItem<Item> WARD_CAMPFIRE_ITEM = ITEMS.register("ward_campfire",
-            () -> new BlockItem(WARD_CAMPFIRE.get(), new Item.Properties()));
-
-    /** 三个方块共用一个 BlockEntity 类型 */
+    /** 火把与墙火把共用一个 BlockEntity 类型 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WardSourceBlockEntity>> WARD_SOURCE_BE =
             BLOCK_ENTITIES.register("ward_source", () -> BlockEntityType.Builder.of(
                     WardSourceBlockEntity::new,
-                    WARD_TORCH.get(), WARD_WALL_TORCH.get(), WARD_CAMPFIRE.get()
+                    WARD_TORCH.get(), WARD_WALL_TORCH.get()
             ).build(null));
 
     public static void register(IEventBus bus) {
