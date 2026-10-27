@@ -45,7 +45,8 @@ public class ModBlocks {
                     .pushReaction(PushReaction.DESTROY)));
 
     public static final DeferredItem<Item> WARD_TORCH_ITEM = ITEMS.register("ward_torch",
-            () -> new BlockItem(WARD_TORCH.get(), new Item.Properties()));
+            () -> new WardTorchItem(WARD_TORCH.get(), WARD_WALL_TORCH.get(),
+                    new Item.Properties(), Direction.DOWN));
 
     /** 火把与墙火把共用一个 BlockEntity 类型 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WardSourceBlockEntity>> WARD_SOURCE_BE =
