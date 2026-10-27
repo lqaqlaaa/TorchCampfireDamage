@@ -64,7 +64,7 @@ public class ModBlocks {
     /** 三个方块共用一个 BlockEntity 类型 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WardSourceBlockEntity>> WARD_SOURCE_BE =
             BLOCK_ENTITIES.register("ward_source", () -> BlockEntityType.Builder.of(
-                    (pos, state) -> new WardSourceBlockEntity(WARD_SOURCE_BE.get(), pos, state),
+                    WardSourceBlockEntity::new,
                     WARD_TORCH.get(), WARD_WALL_TORCH.get(), WARD_CAMPFIRE.get()
             ).build(null));
 
