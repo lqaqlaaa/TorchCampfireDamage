@@ -19,6 +19,11 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> ANNOUNCE_KILLS;
     public static final ModConfigSpec.ConfigValue<Double> ANNOUNCE_RANGE;
     public static final ModConfigSpec.ConfigValue<Boolean> PLAY_SOUND;
+    public static final ModConfigSpec.ConfigValue<Boolean> GLOW_HIT_TARGETS;
+    public static final ModConfigSpec.ConfigValue<Integer> GLOW_DURATION;
+    public static final ModConfigSpec.ConfigValue<Boolean> SLOW_HIT_TARGETS;
+    public static final ModConfigSpec.ConfigValue<Integer> SLOW_AMPLIFIER;
+    public static final ModConfigSpec.ConfigValue<Integer> SLOW_DURATION;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -78,6 +83,27 @@ public class ModConfig {
 
         PLAY_SOUND = builder
                 .comment("经验被吸收到火源位置时播放音效").define("playSound", true);
+
+        // ---- 命中附加效果 ----
+        GLOW_HIT_TARGETS = builder
+                .comment("被火源击中的目标是否获得发光效果（便于在黑暗中定位）")
+                .define("glowHitTargets", false);
+
+        GLOW_DURATION = builder
+                .comment("发光持续时间（tick，20 tick = 1秒）。每次命中都会刷新。")
+                .defineInRange("glowDuration", 100, 1, 100000);
+
+        SLOW_HIT_TARGETS = builder
+                .comment("被火源击中的目标是否被赋予减速效果")
+                .define("slowHitTargets", false);
+
+        SLOW_AMPLIFIER = builder
+                .comment("减速等级（0 = 缓慢I，1 = 缓慢II，…… 254 = 缓慢255）。填写等级而非实际数值。")
+                .defineInRange("slowAmplifier", 254, 0, 254);
+
+        SLOW_DURATION = builder
+                .comment("减速持续时间（tick，20 tick = 1秒）。每次命中都会刷新。")
+                .defineInRange("slowDuration", 100, 1, 100000);
 
         builder.pop();
         SPEC = builder.build();
