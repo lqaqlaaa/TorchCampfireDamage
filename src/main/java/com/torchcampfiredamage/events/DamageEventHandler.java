@@ -161,7 +161,7 @@ public class DamageEventHandler {
         List<BlockPos> snapshot = new ArrayList<>(torches);
 
         // 只处理「附近有玩家」的火把（避免加载远处区块实体）
-        List<Player> players = level.players();
+        List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
             BlockEntity be = level.getBlockEntity(ip);
