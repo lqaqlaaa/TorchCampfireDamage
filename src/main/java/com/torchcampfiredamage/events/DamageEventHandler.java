@@ -169,7 +169,18 @@ public class DamageEventHandler {
     private static int PROF_TICKS = 0;
 
     private static void handle(ServerLevel level) {
-        // 最快路径：全局没有登记任何火把 → 一次 int 比较就返回
+        // 最快路径：全局没有登记任何火把，且没有待清理项 → 直接返回
+        if (TOTAL_REGISTERED == 0 && pendingCleanup.isEmpty() && GLOW_EXPIRY.isEmpty()) {
+            return;
+        }
+
+        // 清理任务每 20 tick 做一次即可，不必每 tick
+        long gameTime = level.getGameTime();
+        if (gameTime % 20 == 0) {
+            if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
+            if (!pendingCleanup.isEmpty()) cleanPending(level);
+        }
+
         if (TOTAL_REGISTERED == 0) {
             return;
         }
@@ -179,10 +190,6 @@ public class DamageEventHandler {
             return;
         }
 
-        if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
-        if (!pendingCleanup.isEmpty()) cleanPending(level);
-
-        long gameTime = level.getGameTime();
         if (gameTime % SCAN_STEP != 0) {
             return;
         }
@@ -301,7 +308,7 @@ public class DamageEventHandler {
                     announceKill(level, center, mob);
                 }
                 // 延迟清理：让 LivingDropsEvent / LivingExperienceDropEvent 有机会读取
-                pendingCleanup.put(mob.getUUID(), 80);
+                pendingCleanup.put(mob.getUUID(), (int) level.getGameTime());
             } else {
                 // 活着 → 撤销传送标记
                 entityDropTargets.remove(mob.getUUID());
@@ -309,18 +316,16 @@ public class DamageEventHandler {
         }
     }
 
-    /** 每 tick 递减待清理计数器，超时后强制清除残留标记 */
+    /** 每 20 tick 清理一次：清掉超过 2 秒仍未消费的传送标记，避免永久驻留 */
     private static void cleanPending(ServerLevel level) {
         if (pendingCleanup.isEmpty()) return;
+        long now = level.getGameTime();
         Iterator<Map.Entry<UUID, Integer>> it = pendingCleanup.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, Integer> e = it.next();
-            int left = e.getValue() - 1;
-            if (left <= 0) {
+            if (now - e.getValue() > 40) {   // 超过 2 秒未消费
                 entityDropTargets.remove(e.getKey());
                 it.remove();
-            } else {
-                e.setValue(left);
             }
         }
     }
@@ -394,6 +399,9 @@ public class DamageEventHandler {
         if (level.isClientSide()) return;
 
         DropTarget target = entityDropTargets.get(entity.getUUID());
+        // 经验事件是死亡流程最后一步，此时可以安全清除所有标记
+        pendingCleanup.remove(entity.getUUID());
+        entityDropTargets.remove(entity.getUUID());
         if (target == null || !target.xp()) return;
         if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
 
