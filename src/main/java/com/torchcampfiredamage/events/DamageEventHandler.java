@@ -59,6 +59,9 @@ public class DamageEventHandler {
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
 
+    /** 记录每个死亡实体已被消费的次数，两个事件都消费后即可安全删除 */
+    private static final Map<UUID, Integer> CONSUMED = new java.util.HashMap<>();
+
     /* ================= 登记接口 ================= */
 
     public static void register(Level level, BlockPos pos) {
@@ -288,6 +291,7 @@ public class DamageEventHandler {
             // 先登记传送目标，再打伤害
             if (tpDrops || tpXp) {
                 entityDropTargets.put(mob.getUUID(), new DropTarget(center, tpDrops, tpXp));
+                CONSUMED.remove(mob.getUUID());   // 重置消费计数
             }
 
             boolean hurtOk = mob.hurt(src, damage);
@@ -381,12 +385,28 @@ public class DamageEventHandler {
         if (level.isClientSide()) return;
 
         DropTarget target = entityDropTargets.get(entity.getUUID());
-        if (target == null || !target.drops()) return;
+        if (target == null || !target.drops()) {
+            markConsumed(entity.getUUID());
+            return;
+        }
 
         BlockPos tp = target.pos();
         for (ItemEntity item : event.getDrops()) {
             item.setPos(tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5);
             item.setDeltaMovement(Vec3.ZERO);
+        }
+        markConsumed(entity.getUUID());
+    }
+
+    /** 标记该实体已被一个事件消费；两个事件都消费后清除传送目标 */
+    private static void markConsumed(java.util.UUID id) {
+        int n = CONSUMED.getOrDefault(id, 0) + 1;
+        if (n >= 2) {
+            CONSUMED.remove(id);
+            entityDropTargets.remove(id);
+            pendingCleanup.remove(id);
+        } else {
+            CONSUMED.put(id, n);
         }
     }
 
@@ -399,10 +419,10 @@ public class DamageEventHandler {
         if (level.isClientSide()) return;
 
         DropTarget target = entityDropTargets.get(entity.getUUID());
-        // 经验事件是死亡流程最后一步，此时可以安全清除所有标记
-        pendingCleanup.remove(entity.getUUID());
-        entityDropTargets.remove(entity.getUUID());
-        if (target == null || !target.xp()) return;
+        if (target == null || !target.xp()) {
+            markConsumed(entity.getUUID());
+            return;
+        }
         if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
 
         int xp = event.getDroppedExperience();
