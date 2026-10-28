@@ -34,35 +34,37 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import java.util.*;
 
 /**
- * 伤害处理器 —— 索引登记模式（性能友好）。
- * <p>
- * 由 BlockEntity 在加载/卸载时调用 register/unregister，
- * tick 时只遍历已登记的火把，与地图大小无关。
+ * 守卫火把伤害处理器。
+ *
+ * 性能设计：
+ *  - 普通 HashMap（不用 WeakHashMap，避免 get 时 expunge 全表）
+ *  - 全局计数器 TOTAL_REGISTERED，无火把时零成本返回
+ *  - 清理每 20 tick 一次
+ *
+ * 传送设计：
+ *  - LivingDropsEvent 与 LivingExperienceDropEvent 顺序不固定
+ *  - CONSUMED 计数，两个事件都处理完才移除标记
  */
 public class DamageEventHandler {
     private static final int SCAN_STEP = 2;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
+    private static final int CLEAN_PERIOD = 20;
 
-    private static final Map<Level, Set<BlockPos>> REGISTERED = new java.util.HashMap<>();
-    private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new java.util.HashMap<>();
-    private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new java.util.HashMap<>();
-
-    /** 生物UUID -> 传送目标（掉落物 / 经验） */
-    private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
-    /** 已死亡、待清理的标记（延迟一 tick 清理，确保两个事件都跑完） */
-    private static final Map<UUID, Integer> pendingCleanup = new HashMap<>();
-
-    private static final Map<Mob, Long> GLOW_EXPIRY = new java.util.HashMap<>();
-    private static boolean DEBUG_PRINTED = false;
-    /** 全局已登记火把总数，用于零成本快速返回 */
+    private static final Map<Level, Set<BlockPos>> REGISTERED = new HashMap<>();
+    private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new HashMap<>();
+    private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new HashMap<>();
     private static int TOTAL_REGISTERED = 0;
+
+    private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
+    private static final Map<UUID, Integer> CONSUMED = new HashMap<>();
+    private static final Map<UUID, Long> pendingCleanup = new HashMap<>();
+
+    private static final Map<Mob, Long> GLOW_EXPIRY = new HashMap<>();
+    private static boolean DEBUG_PRINTED = false;
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
 
-    /** 记录每个死亡实体已被消费的次数，两个事件都消费后即可安全删除 */
-    private static final Map<UUID, Integer> CONSUMED = new java.util.HashMap<>();
-
-    /* ================= 登记接口 ================= */
+    /* ================= 登记 ================= */
 
     public static void register(Level level, BlockPos pos) {
         if (level.isClientSide()) return;
@@ -71,10 +73,7 @@ public class DamageEventHandler {
             set = new HashSet<>();
             REGISTERED.put(level, set);
         }
-        // BlockPos 已由调用方保证不可变，避免重复生成对象
-        if (set.add(pos)) {
-            TOTAL_REGISTERED++;
-        }
+        if (set.add(pos)) TOTAL_REGISTERED++;
     }
 
     public static void unregister(Level level, BlockPos pos) {
@@ -92,7 +91,7 @@ public class DamageEventHandler {
 
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
-        TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] Server started. Ward torches ready (indexed).");
+        TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] Server started. Ward torches ready.");
     }
 
     private static <T> T safeGet(java.util.function.Supplier<T> supplier, T def) {
@@ -114,7 +113,6 @@ public class DamageEventHandler {
             double maxX = (double) (cx + r + 1) * CHUNK_SIZE;
             double minZ = (double) (cz - r) * CHUNK_SIZE;
             double maxZ = (double) (cz + r + 1) * CHUNK_SIZE;
-            // Y 轴只取 128 格（原版怪物活动/巡逻范围级别），避免大范围实体查询
             double y = center.getY();
             return new AABB(minX, y - 64, minZ, maxX, y + 64, maxZ);
         } else {
@@ -141,61 +139,32 @@ public class DamageEventHandler {
     @SubscribeEvent
     public void onLevelTick(LevelTickEvent.Post event) {
         Level level = event.getLevel();
-        if (!(level instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        long t0 = System.nanoTime();
+        if (!(level instanceof ServerLevel serverLevel)) return;
         try {
             handle(serverLevel);
         } catch (Throwable t) {
-            TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] tick error: " + t);
-            t.printStackTrace();
-        }
-        // 性能诊断：每 100 tick 报告一次耗时
-        long used = System.nanoTime() - t0;
-        PROF_TOTAL_NS += used;
-        PROF_TICKS++;
-        if (PROF_TICKS >= 100) {
-            long avgUs = PROF_TOTAL_NS / PROF_TICKS / 1000;
-            if (avgUs > 50) {   // 超过 50 微秒才报告（正常应 <5µs）
-                TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage][PERF] avg=" + avgUs + "us/tick"
-                        + " torches=" + (REGISTERED.get(serverLevel) == null ? 0 : REGISTERED.get(serverLevel).size())
-                        + " glow=" + GLOW_EXPIRY.size()
-                        + " pending=" + pendingCleanup.size());
-            }
-            PROF_TOTAL_NS = 0;
-            PROF_TICKS = 0;
+            TorchCampfireDamage.LOGGER.error("[TorchCampfireDamage] tick error", t);
         }
     }
 
-    private static long PROF_TOTAL_NS = 0;
-    private static int PROF_TICKS = 0;
-
     private static void handle(ServerLevel level) {
-        // 最快路径：全局没有登记任何火把，且没有待清理项 → 直接返回
         if (TOTAL_REGISTERED == 0 && pendingCleanup.isEmpty() && GLOW_EXPIRY.isEmpty()) {
             return;
         }
 
-        // 清理任务每 20 tick 做一次即可，不必每 tick
         long gameTime = level.getGameTime();
-        if (gameTime % 20 == 0) {
+
+        if (gameTime % CLEAN_PERIOD == 0) {
             if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
-            if (!pendingCleanup.isEmpty()) cleanPending(level);
+            if (!pendingCleanup.isEmpty()) cleanPending(level, gameTime);
         }
 
-        if (TOTAL_REGISTERED == 0) {
-            return;
-        }
+        if (TOTAL_REGISTERED == 0) return;
 
         Set<BlockPos> torches = REGISTERED.get(level);
-        if (torches == null || torches.isEmpty()) {
-            return;
-        }
+        if (torches == null || torches.isEmpty()) return;
 
-        if (gameTime % SCAN_STEP != 0) {
-            return;
-        }
+        if (gameTime % SCAN_STEP != 0) return;
 
         if (!DEBUG_PRINTED) {
             DEBUG_PRINTED = true;
@@ -217,7 +186,6 @@ public class DamageEventHandler {
             }
             if (!ward.isEnabled()) continue;
 
-            // 找最近玩家
             Player nearest = null;
             double nearestSq = Double.MAX_VALUE;
             for (Player p : players) {
@@ -239,7 +207,7 @@ public class DamageEventHandler {
             long last = damageTimes.getOrDefault(ip, Long.MIN_VALUE / 2);
             if (gameTime - last < interval) continue;
 
-            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick);
+            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick, gameTime);
             damageTimes.put(ip, gameTime);
         }
     }
@@ -247,7 +215,7 @@ public class DamageEventHandler {
     /* ================= 伤害 ================= */
 
     private static void damageHostiles(ServerLevel level, BlockPos center, WardSourceBlockEntity ward,
-                                       UUID ownerUUID, Set<UUID> damagedThisTick) {
+                                       UUID ownerUUID, Set<UUID> damagedThisTick, long gameTime) {
         AABB area = damageArea(center, ward);
         Player owner = ownerUUID == null ? null : level.getPlayerByUUID(ownerUUID);
 
@@ -266,10 +234,9 @@ public class DamageEventHandler {
             if (ignoreNamed && mob.hasCustomName()) continue;
             if (!isHostileToPlayers(mob)) continue;
 
-            // 附加效果
             if (glowing) {
                 mob.setGlowingTag(true);
-                GLOW_EXPIRY.put(mob, level.getGameTime() + safeGet(ModConfig.GLOW_DURATION::get, 100));
+                GLOW_EXPIRY.put(mob, gameTime + safeGet(ModConfig.GLOW_DURATION::get, 100));
             }
             if (slow) {
                 mob.addEffect(new MobEffectInstance(
@@ -288,15 +255,15 @@ public class DamageEventHandler {
                     ? level.damageSources().playerAttack(owner)
                     : level.damageSources().magic();
 
-            // 先登记传送目标，再打伤害
             if (tpDrops || tpXp) {
-                entityDropTargets.put(mob.getUUID(), new DropTarget(center, tpDrops, tpXp));
-                CONSUMED.remove(mob.getUUID());   // 重置消费计数
+                UUID id = mob.getUUID();
+                entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp));
+                CONSUMED.remove(id);
+                pendingCleanup.put(id, gameTime);
             }
 
             boolean hurtOk = mob.hurt(src, damage);
             if (!hurtOk) {
-                // 强制扣血（穿透无敌帧 / 免疫）
                 mob.invulnerableTime = 0;
                 float nh = mob.getHealth() - damage;
                 mob.setHealth(Math.max(0.0f, nh));
@@ -311,31 +278,18 @@ public class DamageEventHandler {
                 if (announce) {
                     announceKill(level, center, mob);
                 }
-                // 延迟清理：让 LivingDropsEvent / LivingExperienceDropEvent 有机会读取
-                pendingCleanup.put(mob.getUUID(), (int) level.getGameTime());
             } else {
-                // 活着 → 撤销传送标记
-                entityDropTargets.remove(mob.getUUID());
+                UUID id = mob.getUUID();
+                entityDropTargets.remove(id);
+                CONSUMED.remove(id);
+                pendingCleanup.remove(id);
             }
         }
     }
 
-    /** 每 20 tick 清理一次：清掉超过 2 秒仍未消费的传送标记，避免永久驻留 */
-    private static void cleanPending(ServerLevel level) {
-        if (pendingCleanup.isEmpty()) return;
-        long now = level.getGameTime();
-        Iterator<Map.Entry<UUID, Integer>> it = pendingCleanup.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, Integer> e = it.next();
-            if (now - e.getValue() > 40) {   // 超过 2 秒未消费
-                entityDropTargets.remove(e.getKey());
-                it.remove();
-            }
-        }
-    }
+    /* ================= 清理 ================= */
 
     private static void tickGlowExpiry(Level level) {
-        if (GLOW_EXPIRY.isEmpty()) return;
         long now = level.getGameTime();
         Iterator<Map.Entry<Mob, Long>> it = GLOW_EXPIRY.entrySet().iterator();
         while (it.hasNext()) {
@@ -349,6 +303,30 @@ public class DamageEventHandler {
                 mob.setGlowingTag(false);
                 it.remove();
             }
+        }
+    }
+
+    private static void cleanPending(ServerLevel level, long now) {
+        Iterator<Map.Entry<UUID, Long>> it = pendingCleanup.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Long> e = it.next();
+            if (now - e.getValue() > 200) {
+                UUID id = e.getKey();
+                entityDropTargets.remove(id);
+                CONSUMED.remove(id);
+                it.remove();
+            }
+        }
+    }
+
+    private static void markConsumed(UUID id) {
+        int n = CONSUMED.getOrDefault(id, 0) + 1;
+        if (n >= 2) {
+            CONSUMED.remove(id);
+            entityDropTargets.remove(id);
+            pendingCleanup.remove(id);
+        } else {
+            CONSUMED.put(id, n);
         }
     }
 
@@ -384,29 +362,18 @@ public class DamageEventHandler {
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        DropTarget target = entityDropTargets.get(entity.getUUID());
-        if (target == null || !target.drops()) {
-            markConsumed(entity.getUUID());
-            return;
-        }
+        UUID id = entity.getUUID();
+        DropTarget target = entityDropTargets.get(id);
 
-        BlockPos tp = target.pos();
-        for (ItemEntity item : event.getDrops()) {
-            item.setPos(tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5);
-            item.setDeltaMovement(Vec3.ZERO);
+        if (target != null && target.drops()) {
+            BlockPos tp = target.pos();
+            for (ItemEntity item : event.getDrops()) {
+                item.setPos(tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5);
+                item.setDeltaMovement(Vec3.ZERO);
+            }
         }
-        markConsumed(entity.getUUID());
-    }
-
-    /** 标记该实体已被一个事件消费；两个事件都消费后清除传送目标 */
-    private static void markConsumed(java.util.UUID id) {
-        int n = CONSUMED.getOrDefault(id, 0) + 1;
-        if (n >= 2) {
-            CONSUMED.remove(id);
-            entityDropTargets.remove(id);
-            pendingCleanup.remove(id);
-        } else {
-            CONSUMED.put(id, n);
+        if (target != null) {
+            markConsumed(id);
         }
     }
 
@@ -418,27 +385,28 @@ public class DamageEventHandler {
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        DropTarget target = entityDropTargets.get(entity.getUUID());
-        if (target == null || !target.xp()) {
-            markConsumed(entity.getUUID());
-            return;
+        UUID id = entity.getUUID();
+        DropTarget target = entityDropTargets.get(id);
+
+        if (target != null && target.xp() && safeGet(ModConfig.TELEPORT_XP::get, true)) {
+            int xp = event.getDroppedExperience();
+            if (xp > 0) {
+                BlockPos tp = target.pos();
+                event.setDroppedExperience(0);
+
+                ExperienceOrb orb = new ExperienceOrb(level,
+                        tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5, xp);
+                orb.setDeltaMovement(Vec3.ZERO);
+                level.addFreshEntity(orb);
+
+                if (safeGet(ModConfig.PLAY_SOUND::get, true)) {
+                    level.playSound(null, tp, SoundEvents.EXPERIENCE_ORB_PICKUP,
+                            SoundSource.PLAYERS, 0.4f, 1.6f);
+                }
+            }
         }
-        if (!safeGet(ModConfig.TELEPORT_XP::get, true)) return;
-
-        int xp = event.getDroppedExperience();
-        if (xp <= 0) return;
-
-        BlockPos tp = target.pos();
-        event.setDroppedExperience(0);
-
-        ExperienceOrb orb = new ExperienceOrb(level,
-                tp.getX() + 0.5, tp.getY() + 1.0, tp.getZ() + 0.5, xp);
-        orb.setDeltaMovement(Vec3.ZERO);
-        level.addFreshEntity(orb);
-
-        if (safeGet(ModConfig.PLAY_SOUND::get, true)) {
-            level.playSound(null, tp, SoundEvents.EXPERIENCE_ORB_PICKUP,
-                    SoundSource.PLAYERS, 0.4f, 1.6f);
+        if (target != null) {
+            markConsumed(id);
         }
     }
 }
