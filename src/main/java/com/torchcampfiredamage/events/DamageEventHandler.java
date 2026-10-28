@@ -43,17 +43,19 @@ public class DamageEventHandler {
     private static final int SCAN_STEP = 2;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
 
-    private static final Map<Level, Set<BlockPos>> REGISTERED = new WeakHashMap<>();
-    private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new WeakHashMap<>();
-    private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new WeakHashMap<>();
+    private static final Map<Level, Set<BlockPos>> REGISTERED = new java.util.HashMap<>();
+    private static final Map<Level, Map<BlockPos, Long>> lastDamageTimes = new java.util.HashMap<>();
+    private static final Map<Level, Map<BlockPos, UUID>> positionOwners = new java.util.HashMap<>();
 
     /** 生物UUID -> 传送目标（掉落物 / 经验） */
     private static final Map<UUID, DropTarget> entityDropTargets = new HashMap<>();
     /** 已死亡、待清理的标记（延迟一 tick 清理，确保两个事件都跑完） */
     private static final Map<UUID, Integer> pendingCleanup = new HashMap<>();
 
-    private static final Map<Mob, Long> GLOW_EXPIRY = new WeakHashMap<>();
+    private static final Map<Mob, Long> GLOW_EXPIRY = new java.util.HashMap<>();
     private static boolean DEBUG_PRINTED = false;
+    /** 全局已登记火把总数，用于零成本快速返回 */
+    private static int TOTAL_REGISTERED = 0;
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
 
@@ -67,16 +69,18 @@ public class DamageEventHandler {
             REGISTERED.put(level, set);
         }
         // BlockPos 已由调用方保证不可变，避免重复生成对象
-        if (set.size() > 4096) {
-            set.clear();   // 防御：异常膨胀时重置，下次 tick 会重新登记
+        if (set.add(pos)) {
+            TOTAL_REGISTERED++;
         }
-        set.add(pos);
     }
 
     public static void unregister(Level level, BlockPos pos) {
         if (level.isClientSide()) return;
         Set<BlockPos> set = REGISTERED.get(level);
-        if (set != null) set.remove(pos);
+        if (set != null && set.remove(pos)) {
+            TOTAL_REGISTERED--;
+            if (TOTAL_REGISTERED < 0) TOTAL_REGISTERED = 0;
+        }
         Map<BlockPos, Long> t = lastDamageTimes.get(level);
         if (t != null) t.remove(pos);
         Map<BlockPos, UUID> o = positionOwners.get(level);
@@ -165,12 +169,13 @@ public class DamageEventHandler {
     private static int PROF_TICKS = 0;
 
     private static void handle(ServerLevel level) {
-        // 极高性价比：没有火把时立刻返回，不碰任何 Map
+        // 最快路径：全局没有登记任何火把 → 一次 int 比较就返回
+        if (TOTAL_REGISTERED == 0) {
+            return;
+        }
+
         Set<BlockPos> torches = REGISTERED.get(level);
         if (torches == null || torches.isEmpty()) {
-            // 仅当有过期发光/待清理项时才做清理
-            if (!GLOW_EXPIRY.isEmpty()) tickGlowExpiry(level);
-            if (!pendingCleanup.isEmpty()) cleanPending(level);
             return;
         }
 
