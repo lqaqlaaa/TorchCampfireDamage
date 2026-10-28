@@ -343,6 +343,16 @@ public class DamageEventHandler {
         }
     }
 
+    /** 供副手火把等外部逻辑登记掉落物/经验传送目标 */
+    public static void putDropTarget(UUID entityId, net.minecraft.core.BlockPos pos,
+                                     boolean drops, boolean xp) {
+        if (drops || xp) {
+            entityDropTargets.put(entityId, new DropTarget(pos, drops, xp));
+            CONSUMED.remove(entityId);
+            pendingCleanup.put(entityId, 0L);
+        }
+    }
+
     private static void markConsumed(UUID id) {
         int n = CONSUMED.getOrDefault(id, 0) + 1;
         if (n >= 2) {

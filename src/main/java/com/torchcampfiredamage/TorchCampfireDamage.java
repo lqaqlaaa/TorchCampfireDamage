@@ -4,6 +4,7 @@ import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.events.DamageEventHandler;
 import com.torchcampfiredamage.events.InteractionHandler;
+import com.torchcampfiredamage.events.OffhandTorchHandler;
 import com.torchcampfiredamage.network.UpdateWardPayload;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
@@ -35,6 +36,7 @@ public class TorchCampfireDamage {
         // 游戏事件
         NeoForge.EVENT_BUS.register(new DamageEventHandler());
         NeoForge.EVENT_BUS.register(new InteractionHandler());
+        NeoForge.EVENT_BUS.register(new OffhandTorchHandler());
 
         // 网络包
         modEventBus.addListener(this::registerPayloads);

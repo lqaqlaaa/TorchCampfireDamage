@@ -12,7 +12,10 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
- * 客户端：检测潜行右键守卫火源 → 打开设置界面。
+ * 客户端：右键守卫火把直接打开设置界面（不需要潜行）。
+ * <p>
+ * 注：潜行 + 右键的路径由服务端 InteractionHandler 拦截，
+ * 这里处理普通右键（不潜行）的情况。
  */
 @EventBusSubscriber(modid = "torchcampfiredamage", value = Dist.CLIENT)
 public class ClientEvents {
@@ -28,6 +31,12 @@ public class ClientEvents {
             return;
         }
 
+        // 有界面打开时不处理
+        if (mc.screen != null) {
+            wasUsePressed = mc.options.keyUse.isDown();
+            return;
+        }
+
         boolean pressed = mc.options.keyUse.isDown();
         boolean justPressed = pressed && !wasUsePressed;
         wasUsePressed = pressed;
@@ -36,11 +45,7 @@ public class ClientEvents {
             return;
         }
 
-        if (!player.isShiftKeyDown()) {
-            return;
-        }
-
-        // 是否瞄准守卫方块
+        // 瞄准守卫方块
         if (mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.BLOCK) {
             return;
         }

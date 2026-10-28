@@ -74,6 +74,30 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isTeleportDrops() { return teleportDrops; }
     public boolean isTeleportXp() { return teleportXp; }
 
+    /**
+     * 放置时用配置文件里的「默认参数」初始化本方块。
+     * 之后可通过 GUI 单独修改，不会影响其他火把。
+     */
+    public void applyDefaults() {
+        try {
+            var c = com.torchcampfiredamage.config.ModConfig.class;
+            this.enabled = com.torchcampfiredamage.config.ModConfig.DEFAULT_ENABLED.get();
+            this.chunkMode = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_MODE.get();
+            this.chunkRadius = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_RADIUS.get();
+            this.blockRadius = com.torchcampfiredamage.config.ModConfig.DEFAULT_BLOCK_RADIUS.get();
+            this.damage = com.torchcampfiredamage.config.ModConfig.DEFAULT_DAMAGE.get();
+            this.interval = com.torchcampfiredamage.config.ModConfig.DEFAULT_INTERVAL.get();
+            this.glowing = com.torchcampfiredamage.config.ModConfig.DEFAULT_GLOWING.get();
+            this.slow = com.torchcampfiredamage.config.ModConfig.DEFAULT_SLOW.get();
+            this.announce = com.torchcampfiredamage.config.ModConfig.DEFAULT_ANNOUNCE.get();
+            this.teleportDrops = com.torchcampfiredamage.config.ModConfig.DEFAULT_TELEPORT_DROPS.get();
+            this.teleportXp = com.torchcampfiredamage.config.ModConfig.DEFAULT_TELEPORT_XP.get();
+            setChanged();
+        } catch (Throwable ignored) {
+            // 配置未加载时保持字段默认值
+        }
+    }
+
     /** 一次性写入全部参数 */
     public void applyAll(boolean enabled, boolean chunkMode, int range, double damage, int interval,
                          boolean glowing, boolean slow, boolean announce,

@@ -33,6 +33,10 @@ public class WardConfigScreen extends Screen {
     private boolean dropTeleport;
     private boolean xpTeleport;
     private boolean showRange;
+    /** 输入框的「工作值」：init() 重建时以它为准，避免从子界面返回被 BE 覆盖 */
+    private String rangeText;
+    private String damageText;
+    private String intervalText;
 
     // 布局
     private static final int ROW_H = 22;
@@ -53,6 +57,9 @@ public class WardConfigScreen extends Screen {
         this.xpTeleport = be.isTeleportXp();
         this.showRange = (Minecraft.getInstance().level != null)
                 && RangeOverlay.has(Minecraft.getInstance().level.dimension(), pos);
+        this.rangeText = String.valueOf(be.isChunkMode() ? be.getChunkRadius() : be.getBlockRadius());
+        this.damageText = String.valueOf(be.getDamage());
+        this.intervalText = String.valueOf(be.getInterval());
     }
 
     @Override
@@ -75,13 +82,15 @@ public class WardConfigScreen extends Screen {
         addRenderableWidget(Button.builder(rangeTypeText(), b -> {
             chunkMode = !chunkMode;
             b.setMessage(rangeTypeText());
-            rangeBox.setValue(String.valueOf(convertRange()));
+            rangeText = String.valueOf(convertRange());
+            rangeBox.setValue(rangeText);
         }).bounds(left, y, BTN_W, 20).build());
         y += ROW_H;
 
         // 伤害范围（数值框）
         rangeBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害范围"));
-        rangeBox.setValue(String.valueOf(chunkMode ? be.getChunkRadius() : be.getBlockRadius()));
+        rangeBox.setValue(rangeText);
+        rangeBox.setResponder(t -> rangeText = t);
         rangeBox.setTooltip(Tooltip.create(Component.literal(
                 "区块模式：0=1x1区块, 1=3x3, 2=5x5, 3=7x7, 4=9x9\n方块模式：格数半径")));
         addRenderableWidget(rangeBox);
@@ -89,14 +98,16 @@ public class WardConfigScreen extends Screen {
 
         // 伤害
         damageBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害"));
-        damageBox.setValue(String.valueOf(be.getDamage()));
+        damageBox.setValue(damageText);
+        damageBox.setResponder(t -> damageText = t);
         damageBox.setTooltip(Tooltip.create(Component.literal("填 0 = 只发光/减速，不造成伤害\n无上限")));
         addRenderableWidget(damageBox);
         y += ROW_H;
 
         // 伤害间隔
         intervalBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害间隔"));
-        intervalBox.setValue(String.valueOf(be.getInterval()));
+        intervalBox.setValue(intervalText);
+        intervalBox.setResponder(t -> intervalText = t);
         intervalBox.setTooltip(Tooltip.create(Component.literal("单位 tick\n20 = 1秒，1 = 每tick")));
         addRenderableWidget(intervalBox);
         y += ROW_H;
