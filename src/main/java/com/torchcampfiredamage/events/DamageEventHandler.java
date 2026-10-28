@@ -229,7 +229,31 @@ public class DamageEventHandler {
         boolean countAsKill = safeGet(ModConfig.COUNT_AS_PLAYER_KILL::get, true);
         boolean ignoreNamed = safeGet(ModConfig.IGNORE_NAMED_MOBS::get, true);
 
-        for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
+        // 大范围保护：AABB 过大时改用「按区块分段查询」，避免单次查询扫描过多 section
+        java.util.List<Mob> candidates;
+        double areaX = area.maxX - area.minX;
+        double areaZ = area.maxZ - area.minZ;
+        if (areaX * areaZ > 256.0 * 256.0) {
+            // 超过 256x256 时，以火把为中心按半径分段查询（每段 128 格）
+            candidates = new ArrayList<>();
+            double halfX = areaX / 2.0;
+            double halfZ = areaZ / 2.0;
+            double step = 128.0;
+            for (double ox = -halfX; ox < halfX; ox += step) {
+                for (double oz = -halfZ; oz < halfZ; oz += step) {
+                    AABB sub = new AABB(
+                            area.minX + ox, area.minY, area.minZ + oz,
+                            Math.min(area.minX + ox + step, area.maxX),
+                            area.maxY,
+                            Math.min(area.minZ + oz + step, area.maxZ));
+                    candidates.addAll(level.getEntitiesOfClass(Mob.class, sub));
+                }
+            }
+        } else {
+            candidates = level.getEntitiesOfClass(Mob.class, area);
+        }
+
+        for (Mob mob : candidates) {
             if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
             if (!isHostileToPlayers(mob)) continue;

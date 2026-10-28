@@ -2,6 +2,7 @@ package com.torchcampfiredamage.client;
 
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.network.UpdateWardPayload;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -31,6 +32,7 @@ public class WardConfigScreen extends Screen {
     private boolean announce;
     private boolean dropTeleport;
     private boolean xpTeleport;
+    private boolean showRange;
 
     // 布局
     private static final int ROW_H = 22;
@@ -49,6 +51,8 @@ public class WardConfigScreen extends Screen {
         this.announce = be.isAnnounce();
         this.dropTeleport = be.isTeleportDrops();
         this.xpTeleport = be.isTeleportXp();
+        this.showRange = (Minecraft.getInstance().level != null)
+                && RangeOverlay.has(Minecraft.getInstance().level.dimension(), pos);
     }
 
     @Override
@@ -129,12 +133,17 @@ public class WardConfigScreen extends Screen {
         }).bounds(right, ry, BTN_W, 20).build());
         ry += ROW_H;
 
-        // ---- 底部：保存 / 取消 ----
+        // ---- 显示范围开关 ----
         int by = top + ROW_H * 5 + 12;
+        addRenderableWidget(Button.builder(showRangeText(), b -> {
+            showRange = !showRange;
+            b.setMessage(showRangeText());
+            updateOverlay();
+        }).bounds(cx - 176, by, 86, 20).build());
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
-                .bounds(cx - 88, by, 86, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
                 .bounds(cx + 2, by, 86, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
+                .bounds(cx + 92, by, 86, 20).build());
 
         this._left = left;
         this._right = right;
@@ -170,9 +179,30 @@ public class WardConfigScreen extends Screen {
         }
     }
 
+    private Component showRangeText() {
+        return Component.literal("显示范围: " + (showRange ? "开" : "关"));
+    }
+
+    /** 根据当前 GUI 数值刷新范围显示 */
+    private void updateOverlay() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+
+        if (!showRange) {
+            RangeOverlay.remove(mc.level.dimension(), pos);
+            return;
+        }
+
+        int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
+                chunkMode ? 0 : 0, chunkMode ? 32 : 512);
+        RangeOverlay.RangeBox box = RangeOverlay.makeBox(
+                pos, chunkMode, range, range, 0x66CCFF);
+        RangeOverlay.set(mc.level.dimension(), pos, box);
+    }
+
     private void save() {
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
-                chunkMode ? 0 : 0, chunkMode ? 4 : 128);
+                chunkMode ? 0 : 0, chunkMode ? 32 : 512);
         double damage = parseDouble(damageBox.getValue(), 2.0);
         int interval = parseInt(intervalBox.getValue(), 20, 1, Integer.MAX_VALUE);
 
@@ -182,6 +212,7 @@ public class WardConfigScreen extends Screen {
 
         be.applyAll(enabled, chunkMode, range, damage, interval,
                 glowing, slow, announce, dropTeleport, xpTeleport);
+        updateOverlay();
         onClose();
     }
 
@@ -220,6 +251,15 @@ public class WardConfigScreen extends Screen {
         for (int i = 0; i < rightLabels.length; i++) {
             gg.drawString(this.font, rightLabels[i], _right - 56, _top + i * ROW_H + 6, 0xFFFFFF);
         }
+    }
+
+    @Override
+    public void onClose() {
+        if (!showRange) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level != null) RangeOverlay.remove(mc.level.dimension(), pos);
+        }
+        super.onClose();
     }
 
     @Override

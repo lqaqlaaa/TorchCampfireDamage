@@ -81,9 +81,9 @@ public class WardSourceBlockEntity extends BlockEntity {
         this.enabled = enabled;
         this.chunkMode = chunkMode;
         if (chunkMode) {
-            this.chunkRadius = Math.max(0, Math.min(4, range));
+            this.chunkRadius = Math.max(0, Math.min(32, range));
         } else {
-            this.blockRadius = Math.max(0, Math.min(128, range));
+            this.blockRadius = Math.max(0, Math.min(512, range));
         }
         this.damage = Math.max(0, damage);
         this.interval = Math.max(1, interval);
