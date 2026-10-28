@@ -60,7 +60,7 @@ public class WardConfigScreen extends Screen {
         int cx = this.width / 2;
         int left = cx - 160;
         int right = cx + 10;
-        int top = this.height / 2 - 88;
+        int top = this.height / 2 - 100;
         int y = top;
 
         // ---- 左列：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 ----
@@ -133,21 +133,31 @@ public class WardConfigScreen extends Screen {
         }).bounds(right, ry, BTN_W, 20).build());
         ry += ROW_H;
 
-        // ---- 显示范围开关 ----
-        int by = top + ROW_H * 5 + 12;
+        // ---- 底部按钮区（两行三列，居中）----
+        int bw = 88;      // 按钮宽
+        int gap = 6;      // 间距
+        int totalW = bw * 3 + gap * 2;
+        int bx0 = cx - totalW / 2;
+        int by1 = top + ROW_H * 5 + 16;
+        int by2 = by1 + 24;
+
+        // 第一行：显示范围 / 显示设置 / 保存
         addRenderableWidget(Button.builder(showRangeText(), b -> {
             showRange = !showRange;
             b.setMessage(showRangeText());
             updateOverlay();
-        }).bounds(cx - 176, by, 86, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
-                .bounds(cx + 2, by, 86, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
-                .bounds(cx + 92, by, 86, 20).build());
-        // 显示设置（方块/透明度）
+        }).bounds(bx0, by1, bw, 20).build());
+
         addRenderableWidget(Button.builder(Component.literal("显示设置"), b ->
                 Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this)))
-                .bounds(cx - 176, by - 24, 86, 20).build());
+                .bounds(bx0 + bw + gap, by1, bw, 20).build());
+
+        addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
+                .bounds(bx0 + (bw + gap) * 2, by1, bw, 20).build());
+
+        // 第二行：取消（居中）
+        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
+                .bounds(cx - bw / 2, by2, bw, 20).build());
 
         this._left = left;
         this._right = right;
