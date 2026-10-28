@@ -144,6 +144,10 @@ public class WardConfigScreen extends Screen {
                 .bounds(cx + 2, by, 86, 20).build());
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
                 .bounds(cx + 92, by, 86, 20).build());
+        // 显示设置（方块/透明度）
+        addRenderableWidget(Button.builder(Component.literal("显示设置"), b ->
+                Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this)))
+                .bounds(cx - 176, by - 24, 86, 20).build());
 
         this._left = left;
         this._right = right;
@@ -195,8 +199,10 @@ public class WardConfigScreen extends Screen {
 
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
+        RangeOverlay.alpha = DisplaySettingsScreen.alpha;
         RangeOverlay.RangeBox box = RangeOverlay.makeBox(
-                pos, chunkMode, range, range);
+                pos, chunkMode, range, range,
+                DisplaySettingsScreen.blockA, DisplaySettingsScreen.blockB);
         RangeOverlay.set(mc.level.dimension(), pos, box);
     }
 
