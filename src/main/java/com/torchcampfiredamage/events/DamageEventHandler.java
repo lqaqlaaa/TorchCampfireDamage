@@ -1,5 +1,6 @@
 package com.torchcampfiredamage.events;
 
+import com.torchcampfiredamage.TorchCampfireDamage;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
@@ -84,7 +85,7 @@ public class DamageEventHandler {
 
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
-        System.out.println("[TorchCampfireDamage] Server started. Ward torches ready (indexed).");
+        TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] Server started. Ward torches ready (indexed).");
     }
 
     private static <T> T safeGet(java.util.function.Supplier<T> supplier, T def) {
@@ -140,7 +141,7 @@ public class DamageEventHandler {
         try {
             handle(serverLevel);
         } catch (Throwable t) {
-            System.out.println("[TorchCampfireDamage] tick error: " + t);
+            TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] tick error: " + t);
             t.printStackTrace();
         }
         // 性能诊断：每 100 tick 报告一次耗时
@@ -150,7 +151,7 @@ public class DamageEventHandler {
         if (PROF_TICKS >= 100) {
             long avgUs = PROF_TOTAL_NS / PROF_TICKS / 1000;
             if (avgUs > 50) {   // 超过 50 微秒才报告（正常应 <5µs）
-                System.out.println("[TorchCampfireDamage][PERF] avg=" + avgUs + "us/tick"
+                TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage][PERF] avg=" + avgUs + "us/tick"
                         + " torches=" + (REGISTERED.get(serverLevel) == null ? 0 : REGISTERED.get(serverLevel).size())
                         + " glow=" + GLOW_EXPIRY.size()
                         + " pending=" + pendingCleanup.size());
@@ -183,7 +184,7 @@ public class DamageEventHandler {
 
         if (!DEBUG_PRINTED) {
             DEBUG_PRINTED = true;
-            System.out.println("[TorchCampfireDamage] indexed tick active, torches=" + torches.size());
+            TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] indexed tick active, torches=" + torches.size());
         }
 
         Map<BlockPos, Long> damageTimes = lastDamageTimes.computeIfAbsent(level, k -> new HashMap<>());
