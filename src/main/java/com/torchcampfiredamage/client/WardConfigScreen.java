@@ -196,7 +196,7 @@ public class WardConfigScreen extends Screen {
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
         RangeOverlay.RangeBox box = RangeOverlay.makeBox(
-                pos, chunkMode, range, range, 0x66CCFF);
+                pos, chunkMode, range, range);
         RangeOverlay.set(mc.level.dimension(), pos, box);
     }
 
