@@ -5,8 +5,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -29,29 +27,30 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * 守卫火把范围显示 —— 真方块渲染（参考 Litematica 思路的轻量版）。
+ * 守卫火把范围显示 —— 边框 + 真半透明。
  * <p>
- * 在火把所在的水平面上，用黑白混凝土方块铺出棋盘格，直观展示作用范围。
- * Y 轴只铺 1 层（因为高度无限）。
+ * 参考 Litematica 的 ghost block：把方块强制塞进 TRANSLUCENT 渲染层，
+ * 并在顶点写入时压低 alpha，让不透明方块也显示成半透明。
+ * <p>
+ * 只画边框（地面一圈 + 四角竖边），中间镂空，避免糊眼。
  */
 @EventBusSubscriber(modid = "torchcampfiredamage", value = Dist.CLIENT)
 public class RangeOverlay {
 
-    public record RangeBox(int minX, int minZ, int maxX, int maxZ, int planeY) {}
+    public record RangeBox(int minX, int minZ, int maxX, int maxZ, int planeY, int height) {}
 
     private record Key(ResourceKey<Level> dim, BlockPos pos) {}
 
     private static final Map<Key, RangeBox> BOXES = new HashMap<>();
 
-    /** 显示用的两种方块（黑白混凝土） */
     private static final BlockState BLOCK_A = Blocks.BLACK_CONCRETE.defaultBlockState();
     private static final BlockState BLOCK_B = Blocks.WHITE_CONCRETE.defaultBlockState();
 
-    /** 平面显示高度（相对火把 Y） */
+    private static final int FRAME_HEIGHT = 3;
     private static final int PLANE_OFFSET = 1;
 
-    /** 单次最多铺多少格，防止超大范围卡死 */
-    private static final int MAX_CELLS = 20000;
+    /** 幽灵方块透明度 */
+    public static float alpha = 0.45f;
 
     public static void set(ResourceKey<Level> dim, BlockPos pos, RangeBox box) {
         BOXES.put(new Key(dim, pos), box);
@@ -74,17 +73,16 @@ public class RangeOverlay {
         if (chunkMode) {
             int cx = SectionPos.blockToSectionCoord(center.getX());
             int cz = SectionPos.blockToSectionCoord(center.getZ());
-            int minX = (cx - chunkRadius) * 16;
-            int maxX = (cx + chunkRadius + 1) * 16;
-            int minZ = (cz - chunkRadius) * 16;
-            int maxZ = (cz + chunkRadius + 1) * 16;
-            return new RangeBox(minX, minZ, maxX, maxZ, planeY);
+            return new RangeBox(
+                    (cx - chunkRadius) * 16, (cz - chunkRadius) * 16,
+                    (cx + chunkRadius + 1) * 16, (cz + chunkRadius + 1) * 16,
+                    planeY, FRAME_HEIGHT);
         } else {
             int r = blockRadius;
             return new RangeBox(
                     center.getX() - r, center.getZ() - r,
                     center.getX() + r + 1, center.getZ() + r + 1,
-                    planeY);
+                    planeY, FRAME_HEIGHT);
         }
     }
 
@@ -100,113 +98,156 @@ public class RangeOverlay {
         if (level == null) return;
 
         Camera cam = event.getCamera();
-        double camX = cam.getPosition().x;
-        double camY = cam.getPosition().y;
-        double camZ = cam.getPosition().z;
-
         PoseStack pose = event.getPoseStack();
+
         pose.pushPose();
-        // 平移到世界原点，避免跟随相机
-        pose.translate(-camX, -camY, -camZ);
+        pose.translate(-cam.getPosition().x, -cam.getPosition().y, -cam.getPosition().z);
 
         BlockRenderDispatcher dispatcher = mc.getBlockRenderer();
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
-
         RandomSource random = RandomSource.create(42L);
 
-        // 半透明
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.depthMask(false);
+        RenderSystem.disableCull();
 
         Iterator<Map.Entry<Key, RangeBox>> it = BOXES.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<Key, RangeBox> e = it.next();
-            Key k = e.getKey();
-
+            Map.Entry<Key, RangeBox> en = it.next();
+            Key k = en.getKey();
             if (!k.dim().equals(level.dimension())) continue;
 
-            RangeBox b = e.getValue();
+            RangeBox b = en.getValue();
 
-            // 火把被拆 → 移除
             if (level.isLoaded(k.pos()) && !(level.getBlockEntity(k.pos()) instanceof
                     com.torchcampfiredamage.block.WardSourceBlockEntity)) {
                 it.remove();
                 continue;
             }
 
-            int w = b.maxX() - b.minX();
-            int d = b.maxZ() - b.minZ();
-            if ((long) w * d > MAX_CELLS) {
-                // 范围过大，只画外圈一两环，避免卡死
-                if (!drawBorderOnly(dispatcher, buffers, pose, level, b)) {
-                    continue;
-                }
-                continue;
-            }
-
-            for (int x = b.minX(); x < b.maxX(); x++) {
-                for (int z = b.minZ(); z < b.maxZ(); z++) {
-                    // 棋盘格：黑白交替
-                    BlockState state = (((x + z) & 1) == 0) ? BLOCK_A : BLOCK_B;
-                    drawBlock(dispatcher, buffers, pose, level, x, b.planeY(), z, state, random);
-                }
-            }
+            drawFrame(dispatcher, buffers, pose, level, b, random);
         }
 
         buffers.endBatch();
 
+        RenderSystem.enableCull();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
-
         pose.popPose();
     }
 
-    /** 范围太大时，只画最外一圈（棋盘格） */
-    private static boolean drawBorderOnly(BlockRenderDispatcher dispatcher, MultiBufferSource buffers,
-                                          PoseStack pose, Level level, RangeBox b) {
-        RandomSource random = RandomSource.create(7L);
-        for (int x = b.minX(); x < b.maxX(); x++) {
-            BlockState s1 = (((x + b.minZ()) & 1) == 0) ? BLOCK_A : BLOCK_B;
-            drawBlock(dispatcher, buffers, pose, level, x, b.planeY(), b.minZ(), s1, random);
+    /** 边框：地面一圈 + 四角竖边 */
+    private static void drawFrame(BlockRenderDispatcher dispatcher, MultiBufferSource buffers,
+                                  PoseStack pose, Level level, RangeBox b, RandomSource random) {
+        int x1 = b.minX(), x2 = b.maxX() - 1;
+        int z1 = b.minZ(), z2 = b.maxZ() - 1;
+        int y0 = b.planeY();
+        int y1 = b.planeY() + b.height();
 
-            BlockState s2 = (((x + b.maxZ() - 1) & 1) == 0) ? BLOCK_A : BLOCK_B;
-            drawBlock(dispatcher, buffers, pose, level, x, b.planeY(), b.maxZ() - 1, s2, random);
+        // 地面一圈
+        for (int x = x1; x <= x2; x++) {
+            ghost(dispatcher, buffers, pose, level, x, y0, z1, pick(x, z1), random);
+            ghost(dispatcher, buffers, pose, level, x, y0, z2, pick(x, z2), random);
         }
-        for (int z = b.minZ() + 1; z < b.maxZ() - 1; z++) {
-            BlockState s1 = (((b.minX() + z) & 1) == 0) ? BLOCK_A : BLOCK_B;
-            drawBlock(dispatcher, buffers, pose, level, b.minX(), b.planeY(), z, s1, random);
+        for (int z = z1 + 1; z <= z2 - 1; z++) {
+            ghost(dispatcher, buffers, pose, level, x1, y0, z, pick(x1, z), random);
+            ghost(dispatcher, buffers, pose, level, x2, y0, z, pick(x2, z), random);
+        }
 
-            BlockState s2 = (((b.maxX() - 1 + z) & 1) == 0) ? BLOCK_A : BLOCK_B;
-            drawBlock(dispatcher, buffers, pose, level, b.maxX() - 1, b.planeY(), z, s2, random);
+        // 四角竖边
+        for (int y = y0 + 1; y <= y1; y++) {
+            ghost(dispatcher, buffers, pose, level, x1, y, z1, pick(x1, z1), random);
+            ghost(dispatcher, buffers, pose, level, x2, y, z1, pick(x2, z1), random);
+            ghost(dispatcher, buffers, pose, level, x1, y, z2, pick(x1, z2), random);
+            ghost(dispatcher, buffers, pose, level, x2, y, z2, pick(x2, z2), random);
         }
-        return true;
     }
 
-    /** 渲染单个方块（半透明） */
-    private static void drawBlock(BlockRenderDispatcher dispatcher, MultiBufferSource buffers,
-                                  PoseStack pose, Level level, int x, int y, int z,
-                                  BlockState state, RandomSource random) {
+    private static BlockState pick(int x, int z) {
+        return (((x + z) & 1) == 0) ? BLOCK_A : BLOCK_B;
+    }
+
+    /** 渲染半透明幽灵方块 */
+    private static void ghost(BlockRenderDispatcher dispatcher, MultiBufferSource buffers,
+                              PoseStack pose, Level level, int x, int y, int z,
+                              BlockState state, RandomSource random) {
         pose.pushPose();
         pose.translate(x, y, z);
 
-        for (RenderType type : ItemBlockRenderTypes.getRenderLayers(state)) {
-            VertexConsumer vc = buffers.getBuffer(type);
-            dispatcher.getModelRenderer().tesselateBlock(
-                    level,
-                    dispatcher.getBlockModel(state),
-                    state,
-                    BlockPos.ZERO,
-                    pose,
-                    vc,
-                    true,
-                    random,
-                    state.getSeed(BlockPos.ZERO),
-                    OverlayTexture.NO_OVERLAY,
-                    ModelData.EMPTY,
-                    type);
-        }
+        VertexConsumer vc = new AlphaVertexConsumer(
+                buffers.getBuffer(RenderType.translucent()), alpha);
+
+        dispatcher.getModelRenderer().tesselateBlock(
+                level,
+                dispatcher.getBlockModel(state),
+                state,
+                BlockPos.ZERO,
+                pose,
+                vc,
+                true,
+                random,
+                state.getSeed(BlockPos.ZERO),
+                OverlayTexture.NO_OVERLAY,
+                ModelData.EMPTY,
+                RenderType.translucent());
 
         pose.popPose();
+    }
+
+    /** 包装 VertexConsumer，压低 alpha */
+    private static final class AlphaVertexConsumer implements VertexConsumer {
+        private final VertexConsumer delegate;
+        private final float a;
+
+        AlphaVertexConsumer(VertexConsumer delegate, float a) {
+            this.delegate = delegate;
+            this.a = a;
+        }
+
+        @Override
+        public VertexConsumer addVertex(float x, float y, float z) {
+            delegate.addVertex(x, y, z);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int r, int g, int b, int alpha) {
+            delegate.setColor(r, g, b, (int) (alpha * a));
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int color) {
+            int r = (color >> 16) & 255;
+            int g = (color >> 8) & 255;
+            int b = color & 255;
+            delegate.setColor(r, g, b, (int) (255 * a));
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv(float u, float v) {
+            delegate.setUv(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv1(int u, int v) {
+            delegate.setUv1(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv2(int u, int v) {
+            delegate.setUv2(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setNormal(float x, float y, float z) {
+            delegate.setNormal(x, y, z);
+            return this;
+        }
     }
 }
