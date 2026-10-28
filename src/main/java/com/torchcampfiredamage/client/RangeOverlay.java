@@ -13,7 +13,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import org.joml.Matrix4f;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -22,28 +21,20 @@ import java.util.Map;
 /**
  * 守卫火把范围显示。
  * <p>
- * 只绘制线框立方体（性能友好），用于在游戏中直观看到火把的作用范围。
+ * 因为作用范围在 Y 轴是无限的，所以只在火把所在的水平面上画一个矩形轮廓，
+ * 并在四个角加一小段竖线示意「向上向下延伸」。
+ * <p>
+ * 渲染使用「相机相对坐标 + pushPose(cameraOffset)」，保证框固定在世界坐标不跟随玩家。
  */
 @EventBusSubscriber(modid = "torchcampfiredamage", value = Dist.CLIENT)
 public class RangeOverlay {
 
-    /**
-     * 显示中的范围框。
-     *
-     * @param minX 最小 X（含）
-     * @param minY 最小 Y（含）
-     * @param minZ 最小 Z（含）
-     * @param maxX 最大 X（不含）
-     * @param maxY 最大 Y（不含）
-     * @param maxZ 最大 Z（不含）
-     */
-    public record RangeBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, int color) {}
+    public record RangeBox(int minX, int minZ, int maxX, int maxZ, int planeY, int color) {}
 
     private record Key(ResourceKey<Level> dim, BlockPos pos) {}
 
     private static final Map<Key, RangeBox> BOXES = new HashMap<>();
 
-    /** 由客户端在打开/关闭 GUI 时调用 */
     public static void set(ResourceKey<Level> dim, BlockPos pos, RangeBox box) {
         BOXES.put(new Key(dim, pos), box);
     }
@@ -60,8 +51,9 @@ public class RangeOverlay {
         return BOXES.containsKey(new Key(dim, pos));
     }
 
-    /** 根据区块/方块模式计算显示用的范围盒 */
+    /** 根据区块/方块模式计算水平面上的范围 */
     public static RangeBox makeBox(BlockPos center, boolean chunkMode, int chunkRadius, int blockRadius, int color) {
+        int planeY = center.getY();
         if (chunkMode) {
             int cx = SectionPos.blockToSectionCoord(center.getX());
             int cz = SectionPos.blockToSectionCoord(center.getZ());
@@ -69,15 +61,13 @@ public class RangeOverlay {
             int maxX = (cx + chunkRadius + 1) * 16;
             int minZ = (cz - chunkRadius) * 16;
             int maxZ = (cz + chunkRadius + 1) * 16;
-            // Y 轴与实际伤害范围一致：±64
-            return new RangeBox(minX, center.getY() - 64, minZ, maxX, center.getY() + 64, maxZ, color);
+            return new RangeBox(minX, minZ, maxX, maxZ, planeY, color);
         } else {
             int r = blockRadius;
-            int ry = Math.min(r, 64);
             return new RangeBox(
-                    center.getX() - r, center.getY() - ry, center.getZ() - r,
-                    center.getX() + r + 1, center.getY() + ry + 1, center.getZ() + r + 1,
-                    color);
+                    center.getX() - r, center.getZ() - r,
+                    center.getX() + r + 1, center.getZ() + r + 1,
+                    planeY, color);
         }
     }
 
@@ -85,33 +75,29 @@ public class RangeOverlay {
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return;
-        }
-        if (BOXES.isEmpty()) {
-            return;
-        }
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        if (BOXES.isEmpty()) return;
 
         Minecraft mc = Minecraft.getInstance();
         Level level = mc.level;
-        if (level == null) {
-            return;
-        }
+        if (level == null) return;
 
         Camera cam = event.getCamera();
         double camX = cam.getPosition().x;
         double camY = cam.getPosition().y;
         double camZ = cam.getPosition().z;
-        int renderDist = mc.options.getEffectiveRenderDistance() * 16;
 
         PoseStack pose = event.getPoseStack();
-        Matrix4f mat = pose.last().pose();
+        // 关键：把坐标系平移到世界原点（抵消相机偏移），否则框会跟着玩家走
+        pose.pushPose();
+        pose.translate(-camX, -camY, -camZ);
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
         RenderSystem.depthMask(false);
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        RenderSystem.lineWidth(2.0f);
 
         Tesselator tesselator = Tesselator.getInstance();
 
@@ -120,23 +106,14 @@ public class RangeOverlay {
             Map.Entry<Key, RangeBox> e = it.next();
             Key k = e.getKey();
 
-            // 不同维度不画
             if (!k.dim().equals(level.dimension())) continue;
 
             RangeBox b = e.getValue();
 
-            // 火把不存在了 → 移除
+            // 火把被拆了 → 移除显示
             if (level.isLoaded(k.pos()) && !(level.getBlockEntity(k.pos()) instanceof
                     com.torchcampfiredamage.block.WardSourceBlockEntity)) {
                 it.remove();
-                continue;
-            }
-
-            // 距离裁剪
-            double dx = k.pos().getX() - camX;
-            double dz = k.pos().getZ() - camZ;
-            if (dx * dx + dz * dz > (double) (renderDist + Math.max(b.maxX() - b.minX(), b.maxZ() - b.minZ())) *
-                    (renderDist + Math.max(b.maxX() - b.minX(), b.maxZ() - b.minZ()))) {
                 continue;
             }
 
@@ -144,32 +121,41 @@ public class RangeOverlay {
             float r = ((color >> 16) & 255) / 255f;
             float g = ((color >> 8) & 255) / 255f;
             float bl = (color & 255) / 255f;
-            float a = 0.85f;
+            float a = 0.9f;
 
             BufferBuilder buf = tesselator.begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR);
 
-            float x1 = (float) (b.minX() - camX);
-            float y1 = (float) (b.minY() - camY);
-            float z1 = (float) (b.minZ() - camZ);
-            float x2 = (float) (b.maxX() - camX);
-            float y2 = (float) (b.maxY() - camY);
-            float z2 = (float) (b.maxZ() - camZ);
+            float x1 = b.minX();
+            float x2 = b.maxX();
+            float z1 = b.minZ();
+            float z2 = b.maxZ();
+            float y = b.planeY() + 0.02f;   // 略微抬高，避免与地面 z-fighting
 
-            // 底部 4 条
-            line(buf, mat, x1, y1, z1, x2, y1, z1, r, g, bl, a);
-            line(buf, mat, x2, y1, z1, x2, y1, z2, r, g, bl, a);
-            line(buf, mat, x2, y1, z2, x1, y1, z2, r, g, bl, a);
-            line(buf, mat, x1, y1, z2, x1, y1, z1, r, g, bl, a);
-            // 顶部 4 条
-            line(buf, mat, x1, y2, z1, x2, y2, z1, r, g, bl, a);
-            line(buf, mat, x2, y2, z1, x2, y2, z2, r, g, bl, a);
-            line(buf, mat, x2, y2, z2, x1, y2, z2, r, g, bl, a);
-            line(buf, mat, x1, y2, z2, x1, y2, z1, r, g, bl, a);
-            // 竖直 4 条
-            line(buf, mat, x1, y1, z1, x1, y2, z1, r, g, bl, a);
-            line(buf, mat, x2, y1, z1, x2, y2, z1, r, g, bl, a);
-            line(buf, mat, x2, y1, z2, x2, y2, z2, r, g, bl, a);
-            line(buf, mat, x1, y1, z2, x1, y2, z2, r, g, bl, a);
+            // ===== 平面上的矩形（4 条边）=====
+            line(buf, pose, x1, y, z1, x2, y, z1, r, g, bl, a);
+            line(buf, pose, x2, y, z1, x2, y, z2, r, g, bl, a);
+            line(buf, pose, x2, y, z2, x1, y, z2, r, g, bl, a);
+            line(buf, pose, x1, y, z2, x1, y, z1, r, g, bl, a);
+
+            // ===== 网格辅助线（每 16 格一条，方便估距）=====
+            float gridStep = (x2 - x1) > 64 ? 32f : 16f;
+            for (float gx = x1 + gridStep; gx < x2; gx += gridStep) {
+                line(buf, pose, gx, y, z1, gx, y, z2, r, g, bl, a * 0.28f);
+            }
+            for (float gz = z1 + gridStep; gz < z2; gz += gridStep) {
+                line(buf, pose, x1, y, gz, x2, y, gz, r, g, bl, a * 0.28f);
+            }
+
+            // ===== 四角短竖线，示意 Y 轴无限延伸 =====
+            float h = 3.0f;
+            line(buf, pose, x1, y, z1, x1, y + h, z1, r, g, bl, a);
+            line(buf, pose, x2, y, z1, x2, y + h, z1, r, g, bl, a);
+            line(buf, pose, x2, y, z2, x2, y + h, z2, r, g, bl, a);
+            line(buf, pose, x1, y, z2, x1, y + h, z2, r, g, bl, a);
+            line(buf, pose, x1, y, z1, x1, y - h, z1, r, g, bl, a * 0.5f);
+            line(buf, pose, x2, y, z1, x2, y - h, z1, r, g, bl, a * 0.5f);
+            line(buf, pose, x2, y, z2, x2, y - h, z2, r, g, bl, a * 0.5f);
+            line(buf, pose, x1, y, z2, x1, y - h, z2, r, g, bl, a * 0.5f);
 
             MeshData mesh = buf.build();
             if (mesh != null) {
@@ -177,15 +163,19 @@ public class RangeOverlay {
             }
         }
 
+        pose.popPose();
+
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
+        RenderSystem.lineWidth(1.0f);
     }
 
-    private static void line(BufferBuilder buf, Matrix4f mat,
+    private static void line(BufferBuilder buf, PoseStack pose,
                              float x1, float y1, float z1,
                              float x2, float y2, float z2,
                              float r, float g, float b, float a) {
+        var mat = pose.last().pose();
         buf.addVertex(mat, x1, y1, z1).setColor(r, g, b, a);
         buf.addVertex(mat, x2, y2, z2).setColor(r, g, b, a);
     }
