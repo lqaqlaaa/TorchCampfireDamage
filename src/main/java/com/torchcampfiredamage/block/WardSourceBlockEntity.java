@@ -76,6 +76,14 @@ public class WardSourceBlockEntity extends BlockEntity {
 
     private final Ring[] rings = new Ring[MAX_RINGS];
 
+    /** 中心旋转的物品 */
+    private net.minecraft.world.item.ItemStack centerItem =
+            new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR);
+    /** 中心物品大小（0.2 ~ 2.0） */
+    private float centerScale = 0.9f;
+    /** 中心物品自转速度（度/tick） */
+    private float centerSpin = 1.5f;
+
     /** 环是否显示 */
     private boolean orbitVisible = true;
 
@@ -166,6 +174,30 @@ public class WardSourceBlockEntity extends BlockEntity {
         sync();
     }
 
+    public net.minecraft.world.item.ItemStack getCenterItem() { return centerItem; }
+
+    public void setCenterItem(net.minecraft.world.item.ItemStack st) {
+        this.centerItem = (st == null) ? net.minecraft.world.item.ItemStack.EMPTY : st.copyWithCount(1);
+        setChanged();
+        sync();
+    }
+
+    public float getCenterScale() { return centerScale; }
+
+    public void setCenterScale(float v) {
+        this.centerScale = Math.max(0.2f, Math.min(2.0f, v));
+        setChanged();
+        sync();
+    }
+
+    public float getCenterSpin() { return centerSpin; }
+
+    public void setCenterSpin(float v) {
+        this.centerSpin = Math.max(-20f, Math.min(20f, v));
+        setChanged();
+        sync();
+    }
+
     public boolean isOrbitVisible() { return orbitVisible; }
 
     public void setOrbitVisible(boolean v) {
@@ -222,6 +254,11 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
         tag.putBoolean("orbitVisible", orbitVisible);
+        tag.putFloat("centerScale", centerScale);
+        tag.putFloat("centerSpin", centerSpin);
+        if (!centerItem.isEmpty()) {
+            tag.put("centerItem", centerItem.save(registries));
+        }
         net.minecraft.nbt.ListTag ringList = new net.minecraft.nbt.ListTag();
         for (int i = 0; i < MAX_RINGS; i++) {
             Ring r = rings[i];
@@ -254,6 +291,11 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
         if (tag.contains("orbitVisible")) orbitVisible = tag.getBoolean("orbitVisible");
+        if (tag.contains("centerScale")) centerScale = tag.getFloat("centerScale");
+        if (tag.contains("centerSpin")) centerSpin = tag.getFloat("centerSpin");
+        if (tag.contains("centerItem")) {
+            centerItem = net.minecraft.world.item.ItemStack.parseOptional(registries, tag.getCompound("centerItem"));
+        }
         if (tag.contains("rings")) {
             net.minecraft.nbt.ListTag ringList = tag.getList("rings", Tag.TAG_COMPOUND);
             for (int i = 0; i < MAX_RINGS && i < ringList.size(); i++) {

@@ -43,6 +43,11 @@ public class DisplaySettingsScreen extends Screen {
         }
     }
 
+    /* ===== 中心物品 ===== */
+    public static ItemStack centerItem = new ItemStack(Items.NETHER_STAR);
+    public static String centerScale = "0.9";
+    public static String centerSpin = "1.5";
+
     public static final RingCfg[] RINGS = new RingCfg[WardSourceBlockEntity.MAX_RINGS];
     public static boolean orbitVisible = true;
 
@@ -57,6 +62,9 @@ public class DisplaySettingsScreen extends Screen {
     /** 从方块实体读取当前配置 */
     public static void loadFrom(WardSourceBlockEntity be) {
         orbitVisible = be.isOrbitVisible();
+        centerItem = be.getCenterItem().copy();
+        centerScale = String.format("%.2f", be.getCenterScale());
+        centerSpin = String.format("%.2f", be.getCenterSpin());
         for (int i = 0; i < WardSourceBlockEntity.MAX_RINGS; i++) {
             var r = be.getRing(i);
             RINGS[i] = new RingCfg(r.item, r.radius, r.speed, r.angle, r.tilt);
@@ -69,6 +77,8 @@ public class DisplaySettingsScreen extends Screen {
     private static final int PANEL_W = 400;
 
     private EditBox alphaBox;
+    private EditBox centerScaleBox;
+    private EditBox centerSpinBox;
     private final EditBox[] radiusBoxes = new EditBox[WardSourceBlockEntity.MAX_RINGS];
     private final EditBox[] speedBoxes  = new EditBox[WardSourceBlockEntity.MAX_RINGS];
     private final EditBox[] angleBoxes  = new EditBox[WardSourceBlockEntity.MAX_RINGS];
@@ -106,8 +116,29 @@ public class DisplaySettingsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("0.45"), b -> alphaBox.setValue("0.45"))
                 .bounds(px + 190, py + 46, 40, ROW_H).build());
 
+        /* ===== 中心物品 ===== */
+        int cY = py + 72;
+
+        addRenderableWidget(Button.builder(Component.literal(""), b ->
+                minecraft.setScreen(new ItemPickerScreen(this, 99)))
+                .bounds(px + 90, cY, ROW_H, ROW_H)
+                .tooltip(Tooltip.create(Component.literal("点击选择中心物品")))
+                .build());
+
+        centerScaleBox = new EditBox(this.font, px + 150, cY, 52, ROW_H, Component.literal("大小"));
+        centerScaleBox.setValue(centerScale);
+        centerScaleBox.setTooltip(Tooltip.create(Component.literal("0.2 ~ 2.0")));
+        centerScaleBox.setResponder(v -> centerScale = v);
+        addRenderableWidget(centerScaleBox);
+
+        centerSpinBox = new EditBox(this.font, px + 208, cY, 52, ROW_H, Component.literal("转速"));
+        centerSpinBox.setValue(centerSpin);
+        centerSpinBox.setTooltip(Tooltip.create(Component.literal("-20 ~ 20 度/tick")));
+        centerSpinBox.setResponder(v -> centerSpin = v);
+        addRenderableWidget(centerSpinBox);
+
         /* ===== 星环 ===== */
-        int ringTop = py + 96;
+        int ringTop = py + 122;
 
         // 表头
         // 列：物品 | 半径 | 速度 | 角度 | 倾角
@@ -191,7 +222,7 @@ public class DisplaySettingsScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int panelH = 96 + WardSystemHeight() + 46;
+        int panelH = 122 + WardSystemHeight() + 46;
         gg.fill(px, py - 4, px + PANEL_W, py + panelH, 0xC0000000);
 
         gg.drawCenteredString(this.font, "显示设置", px + PANEL_W / 2, py + 2, 0xFFD700);
@@ -204,9 +235,14 @@ public class DisplaySettingsScreen extends Screen {
         gg.renderItem(new ItemStack(blockB), px + 208, py + 23);
 
         /* ===== 星环 ===== */
-        gg.drawString(this.font, "§e星环（最多 5 环）", px + 12, py + 78, 0xFFFFFF);
+        gg.drawString(this.font, "§e中心物品", px + 12, py + 78, 0xFFFFFF);
+        gg.fill(px + 89, py + 71, px + 111, py + 93, 0xFF3A3A3A);
+        if (!centerItem.isEmpty()) {
+            gg.renderItem(centerItem, px + 92, py + 74);
+        }
+        gg.drawString(this.font, "§e星环（最多 5 环）", px + 12, py + 104, 0xFFFFFF);
 
-        int ringTop = py + 96;
+        int ringTop = py + 122;
         // 表头
         gg.drawString(this.font, "物品", px + 46, ringTop - 12, 0xAAAAAA);
         gg.drawString(this.font, "半径", px + 100, ringTop - 12, 0xAAAAAA);

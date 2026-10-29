@@ -19,6 +19,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record UpdateOrbitPayload(
         BlockPos pos,
         boolean visible,
+        ItemStack centerItem,
+        float centerScale,
+        float centerSpin,
         RingData[] rings
 ) implements CustomPacketPayload {
 
@@ -36,6 +39,9 @@ public record UpdateOrbitPayload(
                 public UpdateOrbitPayload decode(RegistryFriendlyByteBuf buf) {
                     BlockPos pos = buf.readBlockPos();
                     boolean vis = buf.readBoolean();
+                    ItemStack centerIt = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
+                    float cScale = buf.readFloat();
+                    float cSpin = buf.readFloat();
                     int n = buf.readVarInt();
                     RingData[] arr = new RingData[n];
                     for (int i = 0; i < n; i++) {
@@ -46,13 +52,17 @@ public record UpdateOrbitPayload(
                         float t = buf.readFloat();
                         arr[i] = new RingData(st, r, s, a, t);
                     }
-                    return new UpdateOrbitPayload(pos, vis, arr);
+                    return new UpdateOrbitPayload(pos, vis, centerIt, cScale, cSpin, arr);
                 }
 
                 @Override
                 public void encode(RegistryFriendlyByteBuf buf, UpdateOrbitPayload p) {
                     buf.writeBlockPos(p.pos());
                     buf.writeBoolean(p.visible());
+                    ItemStack.OPTIONAL_STREAM_CODEC.encode(buf,
+                            p.centerItem() == null ? ItemStack.EMPTY : p.centerItem());
+                    buf.writeFloat(p.centerScale());
+                    buf.writeFloat(p.centerSpin());
                     RingData[] arr = p.rings() == null ? new RingData[0] : p.rings();
                     buf.writeVarInt(arr.length);
                     for (RingData rd : arr) {
@@ -83,6 +93,9 @@ public record UpdateOrbitPayload(
             if (!(be instanceof WardSourceBlockEntity ward)) return;
 
             ward.setOrbitVisible(p.visible());
+            ward.setCenterItem(p.centerItem() == null ? ItemStack.EMPTY : p.centerItem());
+            ward.setCenterScale(p.centerScale());
+            ward.setCenterSpin(p.centerSpin());
 
             RingData[] arr = p.rings();
             if (arr == null) return;

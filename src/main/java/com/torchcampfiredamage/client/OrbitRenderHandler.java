@@ -57,6 +57,26 @@ public class OrbitRenderHandler {
 
             int visibleCount = 0;
 
+            // ===== 中心物品 =====
+            ItemStack center = be.getCenterItem();
+                pose.pushPose();
+                pose.translate(0.5, cy, 0.5);
+
+                // 中心物品也轻轻上下浮动
+                float cbob = Mth.sin(time * 0.08f) * 0.03f;
+                pose.translate(0, cbob, 0);
+
+                // 自转
+                pose.mulPose(Axis.YP.rotationDegrees(time * be.getCenterSpin()));
+
+                float cs = be.getCenterScale();
+                pose.scale(cs, cs, cs);
+
+                itemRenderer.renderStatic(center, ItemDisplayContext.GROUND, light, overlay,
+                        pose, buffers, level, 0);
+                pose.popPose();
+            }
+
             // 逐环渲染
             for (int ri = 0; ri < WardSourceBlockEntity.MAX_RINGS; ri++) {
                 WardSourceBlockEntity.Ring ring = be.getRing(ri);

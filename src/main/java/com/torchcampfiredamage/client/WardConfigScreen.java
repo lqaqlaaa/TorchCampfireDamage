@@ -255,7 +255,12 @@ public class WardConfigScreen extends Screen {
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.torchcampfiredamage.network.UpdateOrbitPayload(
-                        pos, DisplaySettingsScreen.orbitVisible, ringData));
+                        pos,
+                        DisplaySettingsScreen.orbitVisible,
+                        DisplaySettingsScreen.centerItem,
+                        parseF(DisplaySettingsScreen.centerScale, 0.9f),
+                        parseF(DisplaySettingsScreen.centerSpin, 1.5f),
+                        ringData));
 
         updateOverlay();
         onClose();

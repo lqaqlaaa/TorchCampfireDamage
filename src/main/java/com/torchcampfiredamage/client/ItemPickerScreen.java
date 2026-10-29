@@ -66,7 +66,11 @@ public class ItemPickerScreen extends Screen {
         }).bounds(cx - 74, gridY + ROWS * CELL + 6, 70, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("清空"), b -> {
-            DisplaySettingsScreen.RINGS[slot].item = ItemStack.EMPTY;
+            if (slot == 99) {
+                DisplaySettingsScreen.centerItem = ItemStack.EMPTY;
+            } else {
+                DisplaySettingsScreen.RINGS[slot].item = ItemStack.EMPTY;
+            }
             minecraft.setScreen(parent);
         }).bounds(cx + 2, gridY + ROWS * CELL + 6, 50, 18).build());
 
@@ -108,7 +112,11 @@ public class ItemPickerScreen extends Screen {
                 int y = gridY + r * CELL;
                 if (mx >= x && mx < x + CELL && my >= y && my < y + CELL) {
                     Item chosen = filtered.get(idx);
-                    DisplaySettingsScreen.RINGS[slot].item = new ItemStack(chosen);
+                    if (slot == 99) {
+                        DisplaySettingsScreen.centerItem = new ItemStack(chosen);
+                    } else {
+                        DisplaySettingsScreen.RINGS[slot].item = new ItemStack(chosen);
+                    }
                     minecraft.setScreen(parent);
                     return true;
                 }
@@ -130,7 +138,10 @@ public class ItemPickerScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        gg.drawCenteredString(this.font, "选择旋转物品（第 " + (slot + 1) + " 个）",
+        String title = (slot == 99)
+                ? "选择中心物品"
+                : ("选择旋转物品（第 " + (slot + 1) + " 环）");
+        gg.drawCenteredString(this.font, title,
                 this.width / 2, gridY - 42, 0xFFD700);
 
         gg.fill(gridX - 2, gridY - 2,
@@ -158,7 +169,9 @@ public class ItemPickerScreen extends Screen {
                 }
 
                 // 当前已选中的物品高亮
-                ItemStack cur = DisplaySettingsScreen.RINGS[slot].item;
+                ItemStack cur = (slot == 99)
+                        ? DisplaySettingsScreen.centerItem
+                        : DisplaySettingsScreen.RINGS[slot].item;
                 if (!cur.isEmpty() && cur.getItem() == it) {
                     gg.fill(x, y, x + CELL, y + 1, 0xFF00FF00);
                     gg.fill(x, y + CELL - 1, x + CELL, y + CELL, 0xFF00FF00);
