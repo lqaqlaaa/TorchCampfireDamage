@@ -109,16 +109,19 @@ public record UpdateOrbitPayload(
             ward.setCenterSpin(p.centerSpin());
 
             RingData[] arr = p.rings();
-            if (arr == null) return;
+            if (arr == null) arr = new RingData[0];
 
-            for (int i = 0; i < WardSourceBlockEntity.MAX_RINGS && i < arr.length; i++) {
+            // 关键：先整体清空，再逐条重建，保证删除生效
+            var list = new java.util.ArrayList<WardSourceBlockEntity.Ring>();
+            int limit = Math.min(WardSourceBlockEntity.MAX_RINGS, arr.length);
+            for (int i = 0; i < limit; i++) {
                 RingData rd = arr[i];
                 WardSourceBlockEntity.Ring ring = new WardSourceBlockEntity.Ring();
                 if (rd != null) {
                     ring.item = (rd.item() == null) ? ItemStack.EMPTY : rd.item().copyWithCount(1);
                     ring.radius = rd.radius();
                     ring.speed = rd.speed();
-                    ring.angle = rd.angle();   // 可正可负，不限制
+                    ring.angle = rd.angle();
                     ring.tilt = rd.tilt();
                     ring.color = rd.color();
                     ring.alpha = rd.alpha();
@@ -126,8 +129,9 @@ public record UpdateOrbitPayload(
                     ring.style = rd.style();
                     ring.spacing = rd.spacing();
                 }
-                ward.setRing(i, ring);
+                list.add(ring);
             }
+            ward.setRings(list);
         });
     }
 }

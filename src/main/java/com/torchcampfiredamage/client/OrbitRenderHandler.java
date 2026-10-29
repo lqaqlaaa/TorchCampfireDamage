@@ -24,13 +24,12 @@ import org.joml.Matrix4f;
 /**
  * 魔法球 + 星环渲染。
  * <p>
- * 轨迹有三种样式（对应 {@link WardSourceBlockEntity.Ring#style}）：
- * <pre>
- *  0 连续环 —— 完整的一圈细线，像行星环，首尾各一小段渐隐
- *  1 拖尾   —— 只画物品后方一段，尾巴越远越淡，像彗星
- *  2 虚线   —— 一圈均匀断开的小段，每段两端渐隐
- * </pre>
- * 所有轨迹都用「面向相机的薄带」绘制，任何视角都有厚度。
+ * 轨迹用「连续折线带」绘制：相邻两段共享同一顶点，所以不会出现断点。
+ * <ul>
+ *   <li>0 连续环 —— 完整一圈，像行星环</li>
+ *   <li>1 拖尾   —— 物品后方 120°，头亮尾淡</li>
+ *   <li>2 虚线   —— 一圈分 8 组短划，段内两端淡</li>
+ * </ul>
  */
 public class OrbitRenderHandler {
 
@@ -45,8 +44,6 @@ public class OrbitRenderHandler {
     }
 
     public static class OrbitRenderer implements BlockEntityRenderer<WardSourceBlockEntity> {
-        /** 轨迹细分段数（越大越平滑） */
-        private static final int SEG = 128;
 
         private final ItemRenderer itemRenderer;
 
@@ -61,7 +58,6 @@ public class OrbitRenderHandler {
 
             var level = Minecraft.getInstance().level;
             float time = (level == null ? 0 : level.getGameTime()) + partialTick;
-
             final double cy = 0.5;
             Vec3 camPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
 
@@ -96,10 +92,9 @@ public class OrbitRenderHandler {
                     pose.mulPose(Axis.XP.rotationDegrees(ring.tilt));
                 }
 
-                // ---- 轨迹 ----
-                drawRingTrail(pose, buffers, ring, curRad, camPos, be);
+                drawTrail(pose, buffers, ring, curRad, camPos, be);
 
-                // ---- 物品 ----
+                // 物品
                 pose.pushPose();
                 pose.translate(Math.cos(curRad) * radius, 0, Math.sin(curRad) * radius);
                 pose.translate(0, Mth.sin((time + ri * 7) * 0.12f) * 0.045f, 0);
@@ -113,16 +108,16 @@ public class OrbitRenderHandler {
             }
         }
 
-        /* ================= 轨迹 ================= */
+        /* ================= 轨迹（连续折线带） ================= */
 
-        private static void drawRingTrail(PoseStack pose, MultiBufferSource buffers,
-                                          WardSourceBlockEntity.Ring ring,
-                                          float curRad, Vec3 camPos,
-                                          WardSourceBlockEntity be) {
+        private static void drawTrail(PoseStack pose, MultiBufferSource buffers,
+                                      WardSourceBlockEntity.Ring ring,
+                                      float curRad, Vec3 camPos,
+                                      WardSourceBlockEntity be) {
             VertexConsumer vc = buffers.getBuffer(RenderType.lightning());
 
             final float radius = ring.radius;
-            final float halfWidth = Math.max(0.004f, ring.width) * 0.5f;
+            final float halfWidth = Math.max(0.006f, ring.width) * 0.5f;
             final float baseAlpha = ring.alpha;
 
             final int color = ring.color;
@@ -131,89 +126,94 @@ public class OrbitRenderHandler {
             final float cb = (color & 255) / 255f;
 
             final int style = ring.style;
-            // 虚线密度：spacing 越小，虚线段越密
             final float spacing = Mth.clamp(ring.spacing, 0.05f, 1.0f);
+
+            // 分段数：按半径自适应，保证段长不会小于线宽（避免断点）
+            int seg = (int) Math.max(48, Math.min(256, radius * 96));
 
             Matrix4f mat = pose.last().pose();
 
-            // 方块中心的世界坐标（用于算相机朝向）
             double wx = be.getBlockPos().getX() + 0.5;
             double wy = be.getBlockPos().getY() + 0.5;
             double wz = be.getBlockPos().getZ() + 0.5;
 
-            // 拖尾覆盖的角度（弧度）：占整圈的 1/3
-            final float TRAIL_SPAN = (float) (Math.PI * 2 / 3.0);
+            // 拖尾覆盖角度
+            final float TRAIL_SPAN = (float) Math.toRadians(120);
 
-            for (int i = 0; i < SEG; i++) {
-                float t0 = i / (float) SEG;
-                float t1 = (i + 1) / (float) SEG;
+            // 虚线：一圈分成 8 组
+            final int DASH_GROUPS = 8;
 
-                float a0 = t0 * (float) (Math.PI * 2);
-                float a1 = t1 * (float) (Math.PI * 2);
+            // ---- 先计算每个采样点的：位置 + alpha + 是否绘制 ----
+            float[] px_ = new float[seg + 1];
+            float[] pz_ = new float[seg + 1];
+            float[] pa_ = new float[seg + 1];
+            boolean[] pd_ = new boolean[seg + 1];
 
-                float alpha0, alpha1;
+            for (int i = 0; i <= seg; i++) {
+                float t = i / (float) seg;
+                float a = t * (float) (Math.PI * 2);
+
+                px_[i] = (float) (Math.cos(a) * radius);
+                pz_[i] = (float) (Math.sin(a) * radius);
+
+                float alpha;
+                boolean draw = true;
 
                 if (style == 0) {
-                    // ===== 连续环：完整一圈，首尾轻微渐隐 =====
-                    alpha0 = baseAlpha;
-                    alpha1 = baseAlpha;
-
+                    alpha = baseAlpha;
                 } else if (style == 1) {
-                    // ===== 拖尾：只画物品后方一段 =====
-                    // 计算该段与物品角度的"落后量"（0 = 在物品处）
-                    float d0 = behind(a0, curRad);
-                    float d1 = behind(a1, curRad);
-                    if (d0 > TRAIL_SPAN && d1 > TRAIL_SPAN) continue;
-
-                    // 越靠近头部越亮
-                    float k0 = 1f - Math.min(d0 / TRAIL_SPAN, 1f);
-                    float k1 = 1f - Math.min(d1 / TRAIL_SPAN, 1f);
-                    // 平方让尾巴衰减更自然
-                    alpha0 = baseAlpha * k0 * k0;
-                    alpha1 = baseAlpha * k1 * k1;
-
+                    float d = behind(a, curRad);
+                    if (d > TRAIL_SPAN) {
+                        draw = false;
+                        alpha = 0;
+                    } else {
+                        float k = 1f - d / TRAIL_SPAN;
+                        alpha = baseAlpha * k * k;
+                    }
                 } else {
-                    // ===== 虚线：均匀断开 =====
-                    // 每段虚线占 spacing 的比例
-                    float onLen = spacing * 0.6f;
-                    float phase0 = t0 * 4f;   // 一圈分成 4 组
-                    float phase1 = t1 * 4f;
-                    boolean on0 = (phase0 - (int) phase0) < onLen;
-                    boolean on1 = (phase1 - (int) phase1) < onLen;
-                    if (!on0 && !on1) continue;
-
-                    // 段内渐隐（两端淡，中间实）
-                    float f0 = on0 ? edgeFade(phase0 - (int) phase0, onLen) : 0f;
-                    float f1 = on1 ? edgeFade(phase1 - (int) phase1, onLen) : 0f;
-                    alpha0 = baseAlpha * f0;
-                    alpha1 = baseAlpha * f1;
+                    // 虚线：8 组，每组占 spacing
+                    float ph = t * DASH_GROUPS;
+                    float frac = ph - (float) Math.floor(ph);
+                    if (frac >= spacing) {
+                        draw = false;
+                        alpha = 0;
+                    } else {
+                        // 段内两端渐隐
+                        float e = Math.max(1e-3f, spacing * 0.18f);
+                        float f = Math.min(frac / e, (spacing - frac) / e);
+                        alpha = baseAlpha * Mth.clamp(f, 0f, 1f);
+                    }
                 }
 
-                if (alpha0 <= 0.004f && alpha1 <= 0.004f) continue;
+                pd_[i] = draw;
+                pa_[i] = Mth.clamp(alpha, 0f, 1f);
+            }
 
-                // ---- 该段两端点 ----
-                double x0 = Math.cos(a0) * radius;
-                double z0 = Math.sin(a0) * radius;
-                double x1 = Math.cos(a1) * radius;
-                double z1 = Math.sin(a1) * radius;
+            // ---- 逐段生成带（相邻段共享顶点，保证连续） ----
+            for (int i = 0; i < seg; i++) {
+                if (!pd_[i] && !pd_[i + 1]) continue;
+                if (pa_[i] <= 0.002f && pa_[i + 1] <= 0.002f) continue;
 
-                // ---- 面向相机的侧向量 ----
-                double mxW = wx + (x0 + x1) * 0.5;
-                double mzW = wz + (z0 + z1) * 0.5;
+                float x0 = px_[i], z0 = pz_[i];
+                float x1 = px_[i + 1], z1 = pz_[i + 1];
 
-                double vx = camPos.x - mxW;
+                // 该段中点 → 相机方向
+                double mwX = wx + (x0 + x1) * 0.5;
+                double mwZ = wz + (z0 + z1) * 0.5;
+                double vx = camPos.x - mwX;
                 double vy = camPos.y - wy;
-                double vz = camPos.z - mzW;
+                double vz = camPos.z - mwZ;
                 double vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
                 if (vl < 1e-5) continue;
                 vx /= vl; vy /= vl; vz /= vl;
 
+                // 切线
                 double tx = x1 - x0, ty = 0, tz = z1 - z0;
                 double tl = Math.sqrt(tx * tx + tz * tz);
                 if (tl < 1e-7) continue;
                 tx /= tl; ty /= tl; tz /= tl;
 
-                // S = T × V
+                // 侧向量 = T × V
                 double sx = ty * vz - tz * vy;
                 double sy = tz * vx - tx * vz;
                 double sz = tx * vy - ty * vx;
@@ -223,34 +223,24 @@ public class OrbitRenderHandler {
                 sy = sy / sl * halfWidth;
                 sz = sz / sl * halfWidth;
 
-                float fx0 = (float) x0, fz0 = (float) z0;
-                float fx1 = (float) x1, fz1 = (float) z1;
                 float fsx = (float) sx, fsy = (float) sy, fsz = (float) sz;
 
-                // 四边形（两三角）
-                vc.addVertex(mat, fx0 + fsx, fsy, fz0 + fsz).setColor(cr, cg, cb, alpha0);
-                vc.addVertex(mat, fx0 - fsx, -fsy, fz0 - fsz).setColor(cr, cg, cb, alpha0);
-                vc.addVertex(mat, fx1 - fsx, -fsy, fz1 - fsz).setColor(cr, cg, cb, alpha1);
+                vc.addVertex(mat, x0 + fsx, fsy, z0 + fsz).setColor(cr, cg, cb, pa_[i]);
+                vc.addVertex(mat, x0 - fsx, -fsy, z0 - fsz).setColor(cr, cg, cb, pa_[i]);
+                vc.addVertex(mat, x1 - fsx, -fsy, z1 - fsz).setColor(cr, cg, cb, pa_[i + 1]);
 
-                vc.addVertex(mat, fx0 + fsx, fsy, fz0 + fsz).setColor(cr, cg, cb, alpha0);
-                vc.addVertex(mat, fx1 - fsx, -fsy, fz1 - fsz).setColor(cr, cg, cb, alpha1);
-                vc.addVertex(mat, fx1 + fsx, fsy, fz1 + fsz).setColor(cr, cg, cb, alpha1);
+                vc.addVertex(mat, x0 + fsx, fsy, z0 + fsz).setColor(cr, cg, cb, pa_[i]);
+                vc.addVertex(mat, x1 - fsx, -fsy, z1 - fsz).setColor(cr, cg, cb, pa_[i + 1]);
+                vc.addVertex(mat, x1 + fsx, fsy, z1 + fsz).setColor(cr, cg, cb, pa_[i + 1]);
             }
         }
 
-        /** 该角度点比 curRad "落后"多少（0 ~ 2π） */
+        /** 该角度点比 curRad 落后多少（0 ~ 2π） */
         private static float behind(float a, float curRad) {
             float d = curRad - a;
             d = (float) (d % (Math.PI * 2));
             if (d < 0) d += (float) (Math.PI * 2);
             return d;
-        }
-
-        /** 段内边缘渐隐：两端 15% 淡入淡出 */
-        private static float edgeFade(float p, float len) {
-            float edge = Math.max(1e-4f, len * 0.15f);
-            float f = Math.min(p / edge, (len - p) / edge);
-            return Mth.clamp(f, 0f, 1f);
         }
     }
 }
