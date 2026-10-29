@@ -105,10 +105,10 @@ public record UpdateOrbitPayload(
                 WardSourceBlockEntity.Ring ring = new WardSourceBlockEntity.Ring();
                 if (rd != null) {
                     ring.item = (rd.item() == null) ? ItemStack.EMPTY : rd.item().copyWithCount(1);
-                    ring.radius = Math.max(0.3f, Math.min(3.0f, rd.radius()));
-                    ring.speed = Math.max(-20f, Math.min(20f, rd.speed()));
-                    ring.angle = rd.angle();
-                    ring.tilt = Math.max(0f, Math.min(90f, rd.tilt()));
+                    ring.radius = rd.radius();
+                    ring.speed = rd.speed();
+                    ring.angle = rd.angle();   // 可正可负，不限制
+                    ring.tilt = rd.tilt();
                 }
                 ward.setRing(i, ring);
             }

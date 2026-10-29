@@ -68,8 +68,8 @@ public class ItemPickerScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("清空"), b -> {
             if (slot == 99) {
                 DisplaySettingsScreen.centerItem = ItemStack.EMPTY;
-            } else {
-                DisplaySettingsScreen.RINGS[slot].item = ItemStack.EMPTY;
+            } else if (slot >= 0 && slot < RingSettingsScreen.RINGS.size()) {
+                RingSettingsScreen.RINGS.get(slot).item = ItemStack.EMPTY;
             }
             minecraft.setScreen(parent);
         }).bounds(cx + 2, gridY + ROWS * CELL + 6, 50, 18).build());
@@ -114,8 +114,8 @@ public class ItemPickerScreen extends Screen {
                     Item chosen = filtered.get(idx);
                     if (slot == 99) {
                         DisplaySettingsScreen.centerItem = new ItemStack(chosen);
-                    } else {
-                        DisplaySettingsScreen.RINGS[slot].item = new ItemStack(chosen);
+                    } else if (slot >= 0 && slot < RingSettingsScreen.RINGS.size()) {
+                        RingSettingsScreen.RINGS.get(slot).item = new ItemStack(chosen);
                     }
                     minecraft.setScreen(parent);
                     return true;
@@ -169,9 +169,14 @@ public class ItemPickerScreen extends Screen {
                 }
 
                 // 当前已选中的物品高亮
-                ItemStack cur = (slot == 99)
-                        ? DisplaySettingsScreen.centerItem
-                        : DisplaySettingsScreen.RINGS[slot].item;
+                ItemStack cur;
+                if (slot == 99) {
+                    cur = DisplaySettingsScreen.centerItem;
+                } else if (slot >= 0 && slot < RingSettingsScreen.RINGS.size()) {
+                    cur = RingSettingsScreen.RINGS.get(slot).item;
+                } else {
+                    cur = ItemStack.EMPTY;
+                }
                 if (!cur.isEmpty() && cur.getItem() == it) {
                     gg.fill(x, y, x + CELL, y + 1, 0xFF00FF00);
                     gg.fill(x, y + CELL - 1, x + CELL, y + CELL, 0xFF00FF00);

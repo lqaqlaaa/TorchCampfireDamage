@@ -44,10 +44,14 @@ public class WardConfigScreen extends Screen {
     private static final int BOX_W = 88;
     private static final int BTN_W = 78;
 
+    /** 最近一次打开的主界面所属方块，供子界面访问 */
+    public static WardSourceBlockEntity lastBE;
+
     public WardConfigScreen(BlockPos pos, WardSourceBlockEntity be) {
         super(Component.literal("守卫火源设置"));
         this.pos = pos;
         this.be = be;
+        lastBE = be;
         this.enabled = be.isEnabled();
         this.chunkMode = be.isChunkMode();
         this.glowing = be.isGlowing();
@@ -164,6 +168,12 @@ public class WardConfigScreen extends Screen {
             Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
         }).bounds(bx0 + bw + gap, by1, bw, 20).build());
 
+        // 星环设置（独立界面）
+        addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
+            RingSettingsScreen.loadFrom(be);
+            Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
+        }).bounds(bx0 + (bw + gap) * 2, by2, bw, 20).build());
+
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
                 .bounds(bx0 + (bw + gap) * 2, by1, bw, 20).build());
 
@@ -242,16 +252,13 @@ public class WardConfigScreen extends Screen {
                 glowing, slow, announce, dropTeleport, xpTeleport);
 
         // 同步星环设置到服务端
-        int ringCount = DisplaySettingsScreen.RINGS.length;
+        var beanRings = RingSettingsScreen.toBeanRings();
+        int ringCount = beanRings.size();
         var ringData = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData[ringCount];
         for (int i = 0; i < ringCount; i++) {
-            var cfg = DisplaySettingsScreen.RINGS[i];
+            var r = beanRings.get(i);
             ringData[i] = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData(
-                    cfg.item,
-                    parseF(cfg.radius, 0.8f),
-                    parseF(cfg.speed, 2.0f),
-                    parseF(cfg.angle, 0f),
-                    parseF(cfg.tilt, 0f));
+                    r.item, r.radius, r.speed, r.angle, r.tilt);
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.torchcampfiredamage.network.UpdateOrbitPayload(

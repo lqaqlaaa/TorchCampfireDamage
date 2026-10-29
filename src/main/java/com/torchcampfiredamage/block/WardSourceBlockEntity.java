@@ -72,9 +72,10 @@ public class WardSourceBlockEntity extends BlockEntity {
         }
     }
 
-    public static final int MAX_RINGS = 5;
+    /** 硬上限（防止无限增长拖垮渲染），实际可自由增删 */
+    public static final int MAX_RINGS = 64;
 
-    private final Ring[] rings = new Ring[MAX_RINGS];
+    private final java.util.List<Ring> rings = new java.util.ArrayList<>();
 
     /** 中心旋转的物品 */
     private net.minecraft.world.item.ItemStack centerItem =
@@ -88,12 +89,10 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean orbitVisible = true;
 
     {
-        for (int i = 0; i < MAX_RINGS; i++) rings[i] = new Ring();
         // 默认第 1 环：下界之星
-        rings[0].item = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR);
-        // 给其他环一些默认差异，方便一眼看出效果
-        rings[1].radius = 1.1f; rings[1].speed = -1.6f; rings[1].angle = 72f;
-        rings[2].radius = 1.4f; rings[2].speed = 1.2f;  rings[2].angle = 144f;
+        Ring r0 = new Ring();
+        r0.item = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR);
+        rings.add(r0);
     }
 
     public WardSourceBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
@@ -162,14 +161,52 @@ public class WardSourceBlockEntity extends BlockEntity {
 
     /* ===== 星环访问器 ===== */
 
+    public int getRingCount() { return rings.size(); }
+
     public Ring getRing(int i) {
-        if (i < 0 || i >= MAX_RINGS) return new Ring();
-        return rings[i];
+        if (i < 0 || i >= rings.size()) return new Ring();
+        return rings.get(i);
     }
 
     public void setRing(int i, Ring r) {
-        if (i < 0 || i >= MAX_RINGS || r == null) return;
-        rings[i] = r.copy();
+        if (i < 0 || r == null) return;
+        if (i < rings.size()) {
+            rings.set(i, r.copy());
+        } else if (i == rings.size() && rings.size() < MAX_RINGS) {
+            rings.add(r.copy());
+        } else {
+            return;
+        }
+        setChanged();
+        sync();
+    }
+
+    /** 新增一个空环 */
+    public boolean addRing() {
+        if (rings.size() >= MAX_RINGS) return false;
+        rings.add(new Ring());
+        setChanged();
+        sync();
+        return true;
+    }
+
+    /** 移除指定环 */
+    public void removeRing(int i) {
+        if (i < 0 || i >= rings.size()) return;
+        rings.remove(i);
+        setChanged();
+        sync();
+    }
+
+    /** 用新列表整体替换（GUI 保存时用） */
+    public void setRings(java.util.List<Ring> list) {
+        rings.clear();
+        if (list != null) {
+            for (Ring r : list) {
+                if (rings.size() >= MAX_RINGS) break;
+                rings.add(r.copy());
+            }
+        }
         setChanged();
         sync();
     }
@@ -260,8 +297,8 @@ public class WardSourceBlockEntity extends BlockEntity {
             tag.put("centerItem", centerItem.save(registries));
         }
         net.minecraft.nbt.ListTag ringList = new net.minecraft.nbt.ListTag();
-        for (int i = 0; i < MAX_RINGS; i++) {
-            Ring r = rings[i];
+        for (int i = 0; i < rings.size(); i++) {
+            Ring r = rings.get(i);
             CompoundTag c = new CompoundTag();
             if (!r.item.isEmpty()) {
                 c.put("item", r.item.save(registries));
@@ -297,6 +334,7 @@ public class WardSourceBlockEntity extends BlockEntity {
             centerItem = net.minecraft.world.item.ItemStack.parseOptional(registries, tag.getCompound("centerItem"));
         }
         if (tag.contains("rings")) {
+            rings.clear();
             net.minecraft.nbt.ListTag ringList = tag.getList("rings", Tag.TAG_COMPOUND);
             for (int i = 0; i < MAX_RINGS && i < ringList.size(); i++) {
                 CompoundTag c = ringList.getCompound(i);
@@ -308,7 +346,7 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (c.contains("speed")) r.speed = c.getFloat("speed");
                 if (c.contains("angle")) r.angle = c.getFloat("angle");
                 if (c.contains("tilt")) r.tilt = c.getFloat("tilt");
-                rings[i] = r;
+                rings.add(r);
             }
         }
     }

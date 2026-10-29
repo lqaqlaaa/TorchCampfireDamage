@@ -74,7 +74,7 @@ public class OrbitRenderHandler {
             }
 
             // ===== 逐环渲染 =====
-            for (int ri = 0; ri < WardSourceBlockEntity.MAX_RINGS; ri++) {
+            for (int ri = 0; ri < be.getRingCount(); ri++) {
                 WardSourceBlockEntity.Ring ring = be.getRing(ri);
                 ItemStack item = ring.item;
                 if (item == null || item.isEmpty()) continue;
