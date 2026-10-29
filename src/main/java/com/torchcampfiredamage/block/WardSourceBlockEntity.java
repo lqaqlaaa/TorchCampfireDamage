@@ -3,6 +3,7 @@ package com.torchcampfiredamage.block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -33,6 +34,20 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean announce = true;
     private boolean teleportDrops = true;
     private boolean teleportXp = true;
+
+    /* ===== 环上旋转物品 ===== */
+    /** 最多 4 个物品（ItemStack，可为空） */
+    private final net.minecraft.world.item.ItemStack[] orbitItems =
+            new net.minecraft.world.item.ItemStack[]{
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR),
+                    net.minecraft.world.item.ItemStack.EMPTY,
+                    net.minecraft.world.item.ItemStack.EMPTY,
+                    net.minecraft.world.item.ItemStack.EMPTY
+            };
+    /** 环是否显示 */
+    private boolean orbitVisible = true;
+    /** 环半径（方块单位，0.3 ~ 2.0） */
+    private float orbitRadius = 0.75f;
 
     public WardSourceBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -98,6 +113,51 @@ public class WardSourceBlockEntity extends BlockEntity {
         }
     }
 
+    /* ===== 环上物品 ===== */
+
+    public net.minecraft.world.item.ItemStack getOrbitItem(int index) {
+        if (index < 0 || index >= 4) return net.minecraft.world.item.ItemStack.EMPTY;
+        return orbitItems[index];
+    }
+
+    public void setOrbitItem(int index, net.minecraft.world.item.ItemStack stack) {
+        if (index < 0 || index >= 4) return;
+        this.orbitItems[index] = stack == null ? net.minecraft.world.item.ItemStack.EMPTY : stack.copyWithCount(1);
+        setChanged();
+        sync();
+    }
+
+    /** 当前实际显示的物品数量 */
+    public int getOrbitCount() {
+        int n = 0;
+        for (var st : orbitItems) {
+            if (!st.isEmpty()) n++;
+        }
+        return n;
+    }
+
+    public boolean isOrbitVisible() { return orbitVisible; }
+
+    public void setOrbitVisible(boolean v) {
+        this.orbitVisible = v;
+        setChanged();
+        sync();
+    }
+
+    public float getOrbitRadius() { return orbitRadius; }
+
+    public void setOrbitRadius(float r) {
+        this.orbitRadius = Math.max(0.3f, Math.min(2.0f, r));
+        setChanged();
+        sync();
+    }
+
+    private void sync() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** 一次性写入全部参数 */
     public void applyAll(boolean enabled, boolean chunkMode, int range, double damage, int interval,
                          boolean glowing, boolean slow, boolean announce,
@@ -139,6 +199,20 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("announce", announce);
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
+        tag.putBoolean("orbitVisible", orbitVisible);
+        tag.putFloat("orbitRadius", orbitRadius);
+        net.minecraft.nbt.ListTag orbit = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < 4; i++) {
+            var st = orbitItems[i];
+            if (st.isEmpty()) {
+                orbit.add(new CompoundTag());
+            } else {
+                CompoundTag c = new CompoundTag();
+                c.put("item", st.save(registries));
+                orbit.add(c);
+            }
+        }
+        tag.put("orbitItems", orbit);
     }
 
     @Override
@@ -156,6 +230,19 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("announce")) announce = tag.getBoolean("announce");
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
+        if (tag.contains("orbitVisible")) orbitVisible = tag.getBoolean("orbitVisible");
+        if (tag.contains("orbitRadius")) orbitRadius = tag.getFloat("orbitRadius");
+        if (tag.contains("orbitItems")) {
+            net.minecraft.nbt.ListTag orbit = tag.getList("orbitItems", Tag.TAG_COMPOUND);
+            for (int i = 0; i < 4 && i < orbit.size(); i++) {
+                CompoundTag c = orbit.getCompound(i);
+                if (c.contains("item")) {
+                    orbitItems[i] = net.minecraft.world.item.ItemStack.parseOptional(registries, c.getCompound("item"));
+                } else {
+                    orbitItems[i] = net.minecraft.world.item.ItemStack.EMPTY;
+                }
+            }
+        }
     }
 
     /* ===== 同步 ===== */

@@ -6,6 +6,7 @@ import com.torchcampfiredamage.events.DamageEventHandler;
 import com.torchcampfiredamage.events.InteractionHandler;
 import com.torchcampfiredamage.events.OffhandTorchHandler;
 import com.torchcampfiredamage.network.UpdateWardPayload;
+import com.torchcampfiredamage.network.UpdateOrbitPayload;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -53,6 +54,10 @@ public class TorchCampfireDamage {
                 UpdateWardPayload.TYPE,
                 UpdateWardPayload.CODEC,
                 UpdateWardPayload::handle);
+        registrar.playToServer(
+                UpdateOrbitPayload.TYPE,
+                UpdateOrbitPayload.CODEC,
+                UpdateOrbitPayload::handle);
         LOGGER.info("[TorchCampfireDamage] Payloads registered.");
     }
 

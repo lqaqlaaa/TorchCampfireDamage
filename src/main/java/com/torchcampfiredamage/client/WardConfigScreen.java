@@ -239,6 +239,19 @@ public class WardConfigScreen extends Screen {
 
         be.applyAll(enabled, chunkMode, range, damage, interval,
                 glowing, slow, announce, dropTeleport, xpTeleport);
+
+        // 同步光环设置到服务端
+        net.minecraft.world.item.ItemStack[] orbit =
+                new net.minecraft.world.item.ItemStack[4];
+        for (int i = 0; i < 4; i++) {
+            orbit[i] = DisplaySettingsScreen.getOrbitItem(i);
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.torchcampfiredamage.network.UpdateOrbitPayload(
+                        pos, orbit,
+                        DisplaySettingsScreen.orbitVisible,
+                        DisplaySettingsScreen.orbitRadius));
+
         updateOverlay();
         onClose();
     }
