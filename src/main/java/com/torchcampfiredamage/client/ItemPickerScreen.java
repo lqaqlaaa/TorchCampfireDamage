@@ -66,7 +66,7 @@ public class ItemPickerScreen extends Screen {
         }).bounds(cx - 74, gridY + ROWS * CELL + 6, 70, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("清空"), b -> {
-            DisplaySettingsScreen.setOrbitItem(slot, ItemStack.EMPTY);
+            DisplaySettingsScreen.RINGS[slot].item = ItemStack.EMPTY;
             minecraft.setScreen(parent);
         }).bounds(cx + 2, gridY + ROWS * CELL + 6, 50, 18).build());
 
@@ -108,7 +108,7 @@ public class ItemPickerScreen extends Screen {
                 int y = gridY + r * CELL;
                 if (mx >= x && mx < x + CELL && my >= y && my < y + CELL) {
                     Item chosen = filtered.get(idx);
-                    DisplaySettingsScreen.setOrbitItem(slot, new ItemStack(chosen));
+                    DisplaySettingsScreen.RINGS[slot].item = new ItemStack(chosen);
                     minecraft.setScreen(parent);
                     return true;
                 }
@@ -158,7 +158,7 @@ public class ItemPickerScreen extends Screen {
                 }
 
                 // 当前已选中的物品高亮
-                ItemStack cur = DisplaySettingsScreen.getOrbitItem(slot);
+                ItemStack cur = DisplaySettingsScreen.RINGS[slot].item;
                 if (!cur.isEmpty() && cur.getItem() == it) {
                     gg.fill(x, y, x + CELL, y + 1, 0xFF00FF00);
                     gg.fill(x, y + CELL - 1, x + CELL, y + CELL, 0xFF00FF00);

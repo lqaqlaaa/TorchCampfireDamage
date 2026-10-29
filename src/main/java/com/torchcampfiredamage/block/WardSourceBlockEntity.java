@@ -35,19 +35,58 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean teleportDrops = true;
     private boolean teleportXp = true;
 
-    /* ===== 环上旋转物品 ===== */
-    /** 最多 4 个物品（ItemStack，可为空） */
-    private final net.minecraft.world.item.ItemStack[] orbitItems =
-            new net.minecraft.world.item.ItemStack[]{
-                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR),
-                    net.minecraft.world.item.ItemStack.EMPTY,
-                    net.minecraft.world.item.ItemStack.EMPTY,
-                    net.minecraft.world.item.ItemStack.EMPTY
-            };
+    /* ===== 星环系统（最多 5 个环） ===== */
+
+    /**
+     * 单个环的配置。
+     *
+     * @param item      环上的物品
+     * @param radius    距中心距离（0.3 ~ 3.0 方块）
+     * @param speed     旋转速度（度/tick，-20 ~ 20）
+     * @param angle     起始角度偏移（0 ~ 360 度）
+     * @param tilt      倾角（0 ~ 90 度，0 = 水平）
+     */
+    public static final class Ring {
+        public net.minecraft.world.item.ItemStack item;
+        public float radius;
+        public float speed;
+        public float angle;
+        public float tilt;
+
+        public Ring() {
+            this.item = net.minecraft.world.item.ItemStack.EMPTY;
+            this.radius = 0.8f;
+            this.speed = 2.0f;
+            this.angle = 0f;
+            this.tilt = 0f;
+        }
+
+        public Ring copy() {
+            Ring r = new Ring();
+            r.item = this.item.copy();
+            r.radius = this.radius;
+            r.speed = this.speed;
+            r.angle = this.angle;
+            r.tilt = this.tilt;
+            return r;
+        }
+    }
+
+    public static final int MAX_RINGS = 5;
+
+    private final Ring[] rings = new Ring[MAX_RINGS];
+
     /** 环是否显示 */
     private boolean orbitVisible = true;
-    /** 环半径（方块单位，0.3 ~ 2.0） */
-    private float orbitRadius = 0.75f;
+
+    {
+        for (int i = 0; i < MAX_RINGS; i++) rings[i] = new Ring();
+        // 默认第 1 环：下界之星
+        rings[0].item = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.NETHER_STAR);
+        // 给其他环一些默认差异，方便一眼看出效果
+        rings[1].radius = 1.1f; rings[1].speed = -1.6f; rings[1].angle = 72f;
+        rings[2].radius = 1.4f; rings[2].speed = 1.2f;  rings[2].angle = 144f;
+    }
 
     public WardSourceBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -113,41 +152,24 @@ public class WardSourceBlockEntity extends BlockEntity {
         }
     }
 
-    /* ===== 环上物品 ===== */
+    /* ===== 星环访问器 ===== */
 
-    public net.minecraft.world.item.ItemStack getOrbitItem(int index) {
-        if (index < 0 || index >= 4) return net.minecraft.world.item.ItemStack.EMPTY;
-        return orbitItems[index];
+    public Ring getRing(int i) {
+        if (i < 0 || i >= MAX_RINGS) return new Ring();
+        return rings[i];
     }
 
-    public void setOrbitItem(int index, net.minecraft.world.item.ItemStack stack) {
-        if (index < 0 || index >= 4) return;
-        this.orbitItems[index] = stack == null ? net.minecraft.world.item.ItemStack.EMPTY : stack.copyWithCount(1);
+    public void setRing(int i, Ring r) {
+        if (i < 0 || i >= MAX_RINGS || r == null) return;
+        rings[i] = r.copy();
         setChanged();
         sync();
-    }
-
-    /** 当前实际显示的物品数量 */
-    public int getOrbitCount() {
-        int n = 0;
-        for (var st : orbitItems) {
-            if (!st.isEmpty()) n++;
-        }
-        return n;
     }
 
     public boolean isOrbitVisible() { return orbitVisible; }
 
     public void setOrbitVisible(boolean v) {
         this.orbitVisible = v;
-        setChanged();
-        sync();
-    }
-
-    public float getOrbitRadius() { return orbitRadius; }
-
-    public void setOrbitRadius(float r) {
-        this.orbitRadius = Math.max(0.3f, Math.min(2.0f, r));
         setChanged();
         sync();
     }
@@ -200,19 +222,20 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
         tag.putBoolean("orbitVisible", orbitVisible);
-        tag.putFloat("orbitRadius", orbitRadius);
-        net.minecraft.nbt.ListTag orbit = new net.minecraft.nbt.ListTag();
-        for (int i = 0; i < 4; i++) {
-            var st = orbitItems[i];
-            if (st.isEmpty()) {
-                orbit.add(new CompoundTag());
-            } else {
-                CompoundTag c = new CompoundTag();
-                c.put("item", st.save(registries));
-                orbit.add(c);
+        net.minecraft.nbt.ListTag ringList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < MAX_RINGS; i++) {
+            Ring r = rings[i];
+            CompoundTag c = new CompoundTag();
+            if (!r.item.isEmpty()) {
+                c.put("item", r.item.save(registries));
             }
+            c.putFloat("radius", r.radius);
+            c.putFloat("speed", r.speed);
+            c.putFloat("angle", r.angle);
+            c.putFloat("tilt", r.tilt);
+            ringList.add(c);
         }
-        tag.put("orbitItems", orbit);
+        tag.put("rings", ringList);
     }
 
     @Override
@@ -231,16 +254,19 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
         if (tag.contains("orbitVisible")) orbitVisible = tag.getBoolean("orbitVisible");
-        if (tag.contains("orbitRadius")) orbitRadius = tag.getFloat("orbitRadius");
-        if (tag.contains("orbitItems")) {
-            net.minecraft.nbt.ListTag orbit = tag.getList("orbitItems", Tag.TAG_COMPOUND);
-            for (int i = 0; i < 4 && i < orbit.size(); i++) {
-                CompoundTag c = orbit.getCompound(i);
+        if (tag.contains("rings")) {
+            net.minecraft.nbt.ListTag ringList = tag.getList("rings", Tag.TAG_COMPOUND);
+            for (int i = 0; i < MAX_RINGS && i < ringList.size(); i++) {
+                CompoundTag c = ringList.getCompound(i);
+                Ring r = new Ring();
                 if (c.contains("item")) {
-                    orbitItems[i] = net.minecraft.world.item.ItemStack.parseOptional(registries, c.getCompound("item"));
-                } else {
-                    orbitItems[i] = net.minecraft.world.item.ItemStack.EMPTY;
+                    r.item = net.minecraft.world.item.ItemStack.parseOptional(registries, c.getCompound("item"));
                 }
+                if (c.contains("radius")) r.radius = c.getFloat("radius");
+                if (c.contains("speed")) r.speed = c.getFloat("speed");
+                if (c.contains("angle")) r.angle = c.getFloat("angle");
+                if (c.contains("tilt")) r.tilt = c.getFloat("tilt");
+                rings[i] = r;
             }
         }
     }

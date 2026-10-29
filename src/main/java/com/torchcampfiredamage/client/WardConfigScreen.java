@@ -159,9 +159,10 @@ public class WardConfigScreen extends Screen {
             updateOverlay();
         }).bounds(bx0, by1, bw, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("显示设置"), b ->
-                Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this)))
-                .bounds(bx0 + bw + gap, by1, bw, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("显示设置"), b -> {
+            DisplaySettingsScreen.loadFrom(be);
+            Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
+        }).bounds(bx0 + bw + gap, by1, bw, 20).build());
 
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
                 .bounds(bx0 + (bw + gap) * 2, by1, bw, 20).build());
@@ -240,20 +241,32 @@ public class WardConfigScreen extends Screen {
         be.applyAll(enabled, chunkMode, range, damage, interval,
                 glowing, slow, announce, dropTeleport, xpTeleport);
 
-        // 同步光环设置到服务端
-        net.minecraft.world.item.ItemStack[] orbit =
-                new net.minecraft.world.item.ItemStack[4];
-        for (int i = 0; i < 4; i++) {
-            orbit[i] = DisplaySettingsScreen.getOrbitItem(i);
+        // 同步星环设置到服务端
+        int ringCount = DisplaySettingsScreen.RINGS.length;
+        var ringData = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData[ringCount];
+        for (int i = 0; i < ringCount; i++) {
+            var cfg = DisplaySettingsScreen.RINGS[i];
+            ringData[i] = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData(
+                    cfg.item,
+                    parseF(cfg.radius, 0.8f),
+                    parseF(cfg.speed, 2.0f),
+                    parseF(cfg.angle, 0f),
+                    parseF(cfg.tilt, 0f));
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.torchcampfiredamage.network.UpdateOrbitPayload(
-                        pos, orbit,
-                        DisplaySettingsScreen.orbitVisible,
-                        DisplaySettingsScreen.orbitRadius));
+                        pos, DisplaySettingsScreen.orbitVisible, ringData));
 
         updateOverlay();
         onClose();
+    }
+
+    private static float parseF(String s, float def) {
+        try {
+            return Float.parseFloat(s.trim());
+        } catch (Exception e) {
+            return def;
+        }
     }
 
     private int parseInt(String s, int def, int min, int max) {

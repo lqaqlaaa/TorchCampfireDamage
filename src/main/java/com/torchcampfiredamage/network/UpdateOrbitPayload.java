@@ -14,14 +14,16 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 客户端 → 服务端：保存火把的「环上旋转物品」设置。
+ * 客户端 → 服务端：保存魔法球的星环设置（最多 5 环）。
  */
 public record UpdateOrbitPayload(
         BlockPos pos,
-        ItemStack[] items,
         boolean visible,
-        float radius
+        RingData[] rings
 ) implements CustomPacketPayload {
+
+    /** 单环数据 */
+    public record RingData(ItemStack item, float radius, float speed, float angle, float tilt) {}
 
     public static final ResourceLocation ID =
             ResourceLocation.fromNamespaceAndPath(TorchCampfireDamage.MOD_ID, "update_orbit");
@@ -33,25 +35,34 @@ public record UpdateOrbitPayload(
                 @Override
                 public UpdateOrbitPayload decode(RegistryFriendlyByteBuf buf) {
                     BlockPos pos = buf.readBlockPos();
-                    ItemStack[] arr = new ItemStack[4];
-                    for (int i = 0; i < 4; i++) {
-                        arr[i] = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
-                    }
                     boolean vis = buf.readBoolean();
-                    float r = buf.readFloat();
-                    return new UpdateOrbitPayload(pos, arr, vis, r);
+                    int n = buf.readVarInt();
+                    RingData[] arr = new RingData[n];
+                    for (int i = 0; i < n; i++) {
+                        ItemStack st = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
+                        float r = buf.readFloat();
+                        float s = buf.readFloat();
+                        float a = buf.readFloat();
+                        float t = buf.readFloat();
+                        arr[i] = new RingData(st, r, s, a, t);
+                    }
+                    return new UpdateOrbitPayload(pos, vis, arr);
                 }
 
                 @Override
                 public void encode(RegistryFriendlyByteBuf buf, UpdateOrbitPayload p) {
                     buf.writeBlockPos(p.pos());
-                    for (int i = 0; i < 4; i++) {
-                        ItemStack st = (p.items() != null && i < p.items().length && p.items()[i] != null)
-                                ? p.items()[i] : ItemStack.EMPTY;
-                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, st);
-                    }
                     buf.writeBoolean(p.visible());
-                    buf.writeFloat(p.radius());
+                    RingData[] arr = p.rings() == null ? new RingData[0] : p.rings();
+                    buf.writeVarInt(arr.length);
+                    for (RingData rd : arr) {
+                        ItemStack st = (rd == null || rd.item() == null) ? ItemStack.EMPTY : rd.item();
+                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, st);
+                        buf.writeFloat(rd == null ? 0.8f : rd.radius());
+                        buf.writeFloat(rd == null ? 2.0f : rd.speed());
+                        buf.writeFloat(rd == null ? 0f : rd.angle());
+                        buf.writeFloat(rd == null ? 0f : rd.tilt());
+                    }
                 }
             };
 
@@ -71,12 +82,23 @@ public record UpdateOrbitPayload(
             BlockEntity be = level.getBlockEntity(pos);
             if (!(be instanceof WardSourceBlockEntity ward)) return;
 
-            for (int i = 0; i < 4; i++) {
-                ItemStack st = (p.items() != null && i < p.items().length) ? p.items()[i] : ItemStack.EMPTY;
-                ward.setOrbitItem(i, st);
-            }
             ward.setOrbitVisible(p.visible());
-            ward.setOrbitRadius(p.radius());
+
+            RingData[] arr = p.rings();
+            if (arr == null) return;
+
+            for (int i = 0; i < WardSourceBlockEntity.MAX_RINGS && i < arr.length; i++) {
+                RingData rd = arr[i];
+                WardSourceBlockEntity.Ring ring = new WardSourceBlockEntity.Ring();
+                if (rd != null) {
+                    ring.item = (rd.item() == null) ? ItemStack.EMPTY : rd.item().copyWithCount(1);
+                    ring.radius = Math.max(0.3f, Math.min(3.0f, rd.radius()));
+                    ring.speed = Math.max(-20f, Math.min(20f, rd.speed()));
+                    ring.angle = rd.angle();
+                    ring.tilt = Math.max(0f, Math.min(90f, rd.tilt()));
+                }
+                ward.setRing(i, ring);
+            }
         });
     }
 }
