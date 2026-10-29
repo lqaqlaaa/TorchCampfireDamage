@@ -43,7 +43,8 @@ public class WardTorchBlock extends Block implements EntityBlock {
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return SHAPE;
+        // 关键：碰撞形状为空 → 生物可以穿过
+        return Shapes.empty();
     }
 
     /** 光线穿透：不遮挡视线（像玻璃那样不阻挡光，但可见） */

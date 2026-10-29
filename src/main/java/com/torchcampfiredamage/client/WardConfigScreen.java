@@ -71,7 +71,9 @@ public class WardConfigScreen extends Screen {
         int cx = this.width / 2;
         int left = cx - 160;
         int right = cx + 10;
-        int top = this.height / 2 - 100;
+        // 内容总高约 5 行 + 2 行按钮 ≈ 190，确保不超出屏幕
+        int contentH = ROW_H * 5 + 60;
+        int top = Math.max(8, (this.height - contentH) / 2);
         int y = top;
 
         // ---- 左列：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 ----

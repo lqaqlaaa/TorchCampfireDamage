@@ -99,8 +99,11 @@ public class RingSettingsScreen extends Screen {
 
     private static final int ROW_H = 22;
     private static final int ROW_GAP = 30;      // 每行两排（参数 + 外观）
-    private static final int PANEL_W = 460;
-    private static final int VISIBLE_ROWS = 4;
+    private static final int PANEL_W = 440;
+    /** 可见行数（按屏幕高度动态计算） */
+    private int visibleRows = 3;
+    /** 每行实际占用高度（两排 + 间隔） */
+    private static final int ROW_BLOCK_H = ROW_H * 2 + 8;
 
     private int px, py;
     private int scroll = 0;
@@ -113,7 +116,29 @@ public class RingSettingsScreen extends Screen {
     @Override
     protected void init() {
         this.px = this.width / 2 - PANEL_W / 2;
-        this.py = Math.max(16, this.height / 2 - 130);
+
+        // 顶部固定占用：标题 14 + 添加上边距 40
+        final int HEAD_H = 50;
+        // 底部固定占用：按钮 20 + 边距 16
+        final int FOOT_H = 40;
+        // 每行额外间距
+        final int ROW_SPACING = 6;
+
+        int rowBlock = ROW_BLOCK_H + ROW_SPACING;
+        int avail = this.height - HEAD_H - FOOT_H - 16;
+        // 动态行数，至少 1 行，最多 6 行
+        this.visibleRows = Math.max(1, Math.min(6, avail / rowBlock));
+
+        // 面板总高
+        int panelH = HEAD_H + visibleRows * rowBlock + FOOT_H;
+        // 垂直居中，但不能超出屏幕
+        this.py = Math.max(8, (this.height - panelH) / 2);
+
+        // 滚动位置修正
+        if (scroll + visibleRows > RINGS.size()) {
+            scroll = Math.max(0, RINGS.size() - visibleRows);
+        }
+
         buildRows();
     }
 
@@ -132,7 +157,7 @@ public class RingSettingsScreen extends Screen {
                 int[] palette = {0x66DDFF, 0xCC66FF, 0xFFD966, 0x66FF88, 0xFF6666, 0xFFFFFF};
                 c.color = palette[RINGS.size() % palette.length];
                 RINGS.add(c);
-                scroll = Math.max(0, RINGS.size() - VISIBLE_ROWS);
+                scroll = Math.max(0, RINGS.size() - visibleRows);
                 if (WardConfigScreen.lastBE != null) {
                     WardConfigScreen.sendOrbit(WardConfigScreen.lastBE.getBlockPos());
                 }
@@ -148,15 +173,15 @@ public class RingSettingsScreen extends Screen {
         }).bounds(px + 14, startY - 26, 22, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("▼"), b -> {
-            if (scroll + VISIBLE_ROWS < RINGS.size()) { scroll++; buildRows(); }
+            if (scroll + visibleRows < RINGS.size()) { scroll++; buildRows(); }
         }).bounds(px + 40, startY - 26, 22, 18).build());
 
-        int shown = Math.min(VISIBLE_ROWS, Math.max(0, RINGS.size() - scroll));
+        int shown = Math.min(visibleRows, Math.max(0, RINGS.size() - scroll));
 
         for (int vi = 0; vi < shown; vi++) {
             final int ri = scroll + vi;
             final RingCfg cfg = RINGS.get(ri);
-            int y = startY + vi * ROW_GAP * 2;
+            int y = startY + vi * (ROW_BLOCK_H + 6);
 
             // ---------- 第一排：删除 / 物品 / 半径 / 速度 / 角度 / 倾角 ----------
             addRenderableWidget(Button.builder(Component.literal("×"), b -> {
@@ -214,19 +239,22 @@ public class RingSettingsScreen extends Screen {
         }
 
         /* 底部 */
-        int by = startY + VISIBLE_ROWS * ROW_GAP * 2 + 4;
+        int by = startY + visibleRows * (ROW_BLOCK_H + 6) + 2;
+        int bw2 = 76;
+        int gap2 = 8;
+        int bx2 = px + (PANEL_W - (bw2 * 2 + gap2)) / 2;
         addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
             if (WardConfigScreen.lastBE != null) {
                 WardConfigScreen.sendOrbit(WardConfigScreen.lastBE.getBlockPos());
             }
             minecraft.setScreen(parent);
-        }).bounds(px + 160, by, 80, 20).build());
+        }).bounds(bx2, by, bw2, 20).build());
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
             if (WardConfigScreen.lastBE != null) {
                 RingSettingsScreen.loadFrom(WardConfigScreen.lastBE);
             }
             minecraft.setScreen(parent);
-        }).bounds(px + 246, by, 80, 20).build());
+        }).bounds(bx2 + bw2 + gap2, by, bw2, 20).build());
     }
 
     private void addEdit(int x, int y, int w, String value, String label,
@@ -252,7 +280,7 @@ public class RingSettingsScreen extends Screen {
             scroll--;
             buildRows();
             return true;
-        } else if (dy < 0 && scroll + VISIBLE_ROWS < RINGS.size()) {
+        } else if (dy < 0 && scroll + visibleRows < RINGS.size()) {
             scroll++;
             buildRows();
             return true;
@@ -265,7 +293,7 @@ public class RingSettingsScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int panelH = 50 + VISIBLE_ROWS * ROW_GAP * 2 + 40;
+        int panelH = 50 + visibleRows * (ROW_BLOCK_H + 6) + 40;
         gg.fill(px, py, px + PANEL_W, py + panelH, 0xC0000000);
 
         gg.drawCenteredString(this.font, "星环设置（共 " + RINGS.size() + " 圈）",
@@ -281,7 +309,7 @@ public class RingSettingsScreen extends Screen {
         gg.drawString(this.font, "角度", px + 198, hy, 0xAAAAAA);
         gg.drawString(this.font, "倾角", px + 254, hy, 0xAAAAAA);
 
-        int shown = Math.min(VISIBLE_ROWS, Math.max(0, RINGS.size() - scroll));
+        int shown = Math.min(visibleRows, Math.max(0, RINGS.size() - scroll));
 
         if (RINGS.isEmpty()) {
             gg.drawCenteredString(this.font, "§7还没有任何圈，点右上角「+ 添加一圈」",
@@ -291,7 +319,7 @@ public class RingSettingsScreen extends Screen {
         for (int vi = 0; vi < shown; vi++) {
             int ri = scroll + vi;
             RingCfg c = RINGS.get(ri);
-            int y = startY + vi * ROW_GAP * 2;
+            int y = startY + vi * (ROW_BLOCK_H + 6);
             int y2 = y + ROW_H + 4;
 
             // 序号
@@ -310,7 +338,7 @@ public class RingSettingsScreen extends Screen {
         }
 
         // 滚动提示
-        if (RINGS.size() > VISIBLE_ROWS) {
+        if (RINGS.size() > visibleRows) {
             gg.drawString(this.font, "§7显示 " + (scroll + 1) + "-" + (scroll + shown)
                             + " / " + RINGS.size(),
                     px + 330, startY - 20, 0x888888);
