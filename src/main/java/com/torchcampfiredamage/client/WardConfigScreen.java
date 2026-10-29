@@ -238,6 +238,27 @@ public class WardConfigScreen extends Screen {
         RangeOverlay.set(mc.level.dimension(), pos, box);
     }
 
+    /** 把星环当前配置发送给服务端（供子界面调用） */
+    public static void sendOrbit(BlockPos pos) {
+        var beanRings = RingSettingsScreen.toBeanRings();
+        int ringCount = beanRings.size();
+        var ringData = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData[ringCount];
+        for (int i = 0; i < ringCount; i++) {
+            var r = beanRings.get(i);
+            ringData[i] = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData(
+                    r.item, r.radius, r.speed, r.angle, r.tilt,
+                    r.color, r.alpha, r.width, r.style, r.spacing);
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.torchcampfiredamage.network.UpdateOrbitPayload(
+                        pos,
+                        DisplaySettingsScreen.orbitVisible,
+                        DisplaySettingsScreen.centerItem,
+                        parseF(DisplaySettingsScreen.centerScale, 0.9f),
+                        parseF(DisplaySettingsScreen.centerSpin, 1.5f),
+                        ringData));
+    }
+
     private void save() {
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);

@@ -133,6 +133,9 @@ public class RingSettingsScreen extends Screen {
                 c.color = palette[RINGS.size() % palette.length];
                 RINGS.add(c);
                 scroll = Math.max(0, RINGS.size() - VISIBLE_ROWS);
+                if (WardConfigScreen.lastBE != null) {
+                    WardConfigScreen.sendOrbit(WardConfigScreen.lastBE.getBlockPos());
+                }
                 buildRows();
             }
         }).bounds(px + 340, py + 12, 110, 20)
@@ -160,6 +163,10 @@ public class RingSettingsScreen extends Screen {
                 if (ri < RINGS.size()) {
                     RINGS.remove(ri);
                     if (scroll > 0 && scroll >= RINGS.size()) scroll = Math.max(0, RINGS.size() - 1);
+                    // 立即同步到服务端
+                    if (WardConfigScreen.lastBE != null) {
+                        WardConfigScreen.sendOrbit(WardConfigScreen.lastBE.getBlockPos());
+                    }
                     buildRows();
                 }
             }).bounds(px + 14, y, 20, ROW_H)
@@ -209,6 +216,9 @@ public class RingSettingsScreen extends Screen {
         /* 底部 */
         int by = startY + VISIBLE_ROWS * ROW_GAP * 2 + 4;
         addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
+            if (WardConfigScreen.lastBE != null) {
+                WardConfigScreen.sendOrbit(WardConfigScreen.lastBE.getBlockPos());
+            }
             minecraft.setScreen(parent);
         }).bounds(px + 160, by, 80, 20).build());
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
