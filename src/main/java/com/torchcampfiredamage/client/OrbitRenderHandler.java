@@ -43,6 +43,39 @@ public class OrbitRenderHandler {
         }
     }
 
+    /**
+     * 自定义渲染层：位置+颜色，半透明混合，不写深度，不剔除背面。
+     * <p>
+     * 关键：比 RenderType.lightning() 的「闪电分段」更可控，
+     * 画出的四边形是完整连续的，不会被打断成点。
+     */
+    public static final net.minecraft.client.renderer.RenderType TRAIL_RENDER_TYPE =
+            net.minecraft.client.renderer.RenderType.create(
+                    "torchcampfiredamage_trail",
+                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR,
+                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+                    256,
+                    false,
+                    false,
+                    net.minecraft.client.renderer.RenderType.CompositeState.builder()
+                            .setShaderState(new net.minecraft.client.renderer.RenderStateShard.ShaderStateShard(
+                                    net.minecraft.client.renderer.GameRenderer::getPositionColorShader))
+                            .setTransparencyState(new net.minecraft.client.renderer.RenderStateShard.TransparencyStateShard(
+                                    "trail_translucent",
+                                    () -> {
+                                        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+                                        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+                                    },
+                                    () -> {
+                                        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+                                    }))
+                            .setCullState(new net.minecraft.client.renderer.RenderStateShard.CullStateShard(false))
+                            .setDepthTestState(new net.minecraft.client.renderer.RenderStateShard.DepthTestStateShard(
+                                    "trail_depth", 515))
+                            .setWriteMaskState(new net.minecraft.client.renderer.RenderStateShard.WriteMaskStateShard(
+                                    true, false))
+                            .createCompositeState(false));
+
     public static class OrbitRenderer implements BlockEntityRenderer<WardSourceBlockEntity> {
 
         private final ItemRenderer itemRenderer;
@@ -114,7 +147,7 @@ public class OrbitRenderHandler {
                                       WardSourceBlockEntity.Ring ring,
                                       float curRad, Vec3 camPos,
                                       WardSourceBlockEntity be) {
-            VertexConsumer vc = buffers.getBuffer(RenderType.lightning());
+            VertexConsumer vc = buffers.getBuffer(TRAIL_RENDER_TYPE);
 
             final float radius = ring.radius;
             final float halfWidth = Math.max(0.006f, ring.width) * 0.5f;
@@ -225,11 +258,11 @@ public class OrbitRenderHandler {
 
                 float fsx = (float) sx, fsy = (float) sy, fsz = (float) sz;
 
+                // QUADS 模式：一个四边形 4 个顶点（按顺序绕一圈）
+                //  v0 = 起点上方   v1 = 起点下方
+                //  v3 = 终点上方   v2 = 终点下方
                 vc.addVertex(mat, x0 + fsx, fsy, z0 + fsz).setColor(cr, cg, cb, pa_[i]);
                 vc.addVertex(mat, x0 - fsx, -fsy, z0 - fsz).setColor(cr, cg, cb, pa_[i]);
-                vc.addVertex(mat, x1 - fsx, -fsy, z1 - fsz).setColor(cr, cg, cb, pa_[i + 1]);
-
-                vc.addVertex(mat, x0 + fsx, fsy, z0 + fsz).setColor(cr, cg, cb, pa_[i]);
                 vc.addVertex(mat, x1 - fsx, -fsy, z1 - fsz).setColor(cr, cg, cb, pa_[i + 1]);
                 vc.addVertex(mat, x1 + fsx, fsy, z1 + fsz).setColor(cr, cg, cb, pa_[i + 1]);
             }
