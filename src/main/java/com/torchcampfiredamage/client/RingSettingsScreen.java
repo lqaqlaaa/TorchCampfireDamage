@@ -14,61 +14,58 @@ import java.util.List;
 
 /**
  * 星环设置（独立界面）：
- *  - 每个环可设：物品、半径、速度、起始角度、倾角
- *  - 可以添加新环、删除任意环
- *  - 环数量不设限制（硬上限 64，防止渲染卡死）
+ *  - 每圈可设：物品、半径、速度、起始角度、倾角
+ *  - 外观：颜色（RGB 轮盘）、透明度、线宽、样式（连续/拖尾/虚线）、间距
+ *  - 可自由添加 / 删除圈
  */
 public class RingSettingsScreen extends Screen {
 
-    /** 客户端工作副本 */
+    /* ================= 数据 ================= */
+
     public static final class RingCfg {
         public ItemStack item = ItemStack.EMPTY;
         public String radius = "0.8";
         public String speed = "2.0";
         public String angle = "0";
         public String tilt = "0";
+        public int color = 0x66DDFF;
+        public String alpha = "0.55";
+        public String width = "0.030";
+        public int style = 0;
+        public String spacing = "0.35";
 
         public RingCfg() {}
 
-        RingCfg(ItemStack it, float r, float s, float a, float t) {
-            item = it == null ? ItemStack.EMPTY : it.copy();
-            radius = String.format("%.2f", r);
-            speed = String.format("%.2f", s);
-            angle = String.format("%.0f", a);
-            tilt = String.format("%.0f", t);
-        }
-
-        public RingCfg copy() {
-            RingCfg c = new RingCfg();
-            c.item = item.copy();
-            c.radius = radius;
-            c.speed = speed;
-            c.angle = angle;
-            c.tilt = tilt;
-            return c;
+        RingCfg(WardSourceBlockEntity.Ring r) {
+            item = r.item == null ? ItemStack.EMPTY : r.item.copy();
+            radius = String.format("%.2f", r.radius);
+            speed = String.format("%.2f", r.speed);
+            angle = String.format("%.0f", r.angle);
+            tilt = String.format("%.0f", r.tilt);
+            color = r.color;
+            alpha = String.format("%.2f", r.alpha);
+            width = String.format("%.3f", r.width);
+            style = r.style;
+            spacing = String.format("%.2f", r.spacing);
         }
     }
 
     public static final List<RingCfg> RINGS = new ArrayList<>();
 
     static {
-        // 默认 1 环：下界之星
         RingCfg r0 = new RingCfg();
         r0.item = new ItemStack(net.minecraft.world.item.Items.NETHER_STAR);
         RINGS.add(r0);
     }
 
-    /** 从方块实体读取 */
     public static void loadFrom(WardSourceBlockEntity be) {
         RINGS.clear();
         int n = be.getRingCount();
         for (int i = 0; i < n; i++) {
-            var r = be.getRing(i);
-            RINGS.add(new RingCfg(r.item, r.radius, r.speed, r.angle, r.tilt));
+            RINGS.add(new RingCfg(be.getRing(i)));
         }
     }
 
-    /** 转成 BE 的 Ring 列表 */
     public static List<WardSourceBlockEntity.Ring> toBeanRings() {
         List<WardSourceBlockEntity.Ring> list = new ArrayList<>();
         for (RingCfg c : RINGS) {
@@ -78,6 +75,11 @@ public class RingSettingsScreen extends Screen {
             r.speed = parse(c.speed, 2.0f);
             r.angle = parse(c.angle, 0f);
             r.tilt = parse(c.tilt, 0f);
+            r.color = c.color;
+            r.alpha = Math.max(0f, Math.min(1f, parse(c.alpha, 0.55f)));
+            r.width = parse(c.width, 0.03f);
+            r.style = c.style;
+            r.spacing = parse(c.spacing, 0.35f);
             list.add(r);
         }
         return list;
@@ -95,16 +97,13 @@ public class RingSettingsScreen extends Screen {
 
     private final Screen parent;
 
-    private static final int ROW_H = 20;
-    private static final int ROW_GAP = 4;
-    private static final int PANEL_W = 420;
-    private static final int VISIBLE_ROWS = 6;
+    private static final int ROW_H = 22;
+    private static final int ROW_GAP = 30;      // 每行两排（参数 + 外观）
+    private static final int PANEL_W = 460;
+    private static final int VISIBLE_ROWS = 4;
 
     private int px, py;
     private int scroll = 0;
-
-    /** 每行的输入框（随滚动重建） */
-    private final List<EditBox[]> rowBoxes = new ArrayList<>();
 
     public RingSettingsScreen(Screen parent) {
         super(Component.literal("星环设置"));
@@ -113,115 +112,128 @@ public class RingSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
-        int cy = this.height / 2;
-        px = cx - PANEL_W / 2;
-        py = Math.max(16, cy - 120);
-
+        this.px = this.width / 2 - PANEL_W / 2;
+        this.py = Math.max(16, this.height / 2 - 130);
         buildRows();
     }
 
-    /** 重建可视区域的行控件 */
     private void buildRows() {
         this.clearWidgets();
-        rowBoxes.clear();
 
-        int startY = py + 40;
+        int startY = py + 50;
 
-        // 顶部按钮：添加环
+        /* 顶部：添加 */
         addRenderableWidget(Button.builder(Component.literal("+ 添加一圈"), b -> {
             if (RINGS.size() < WardSourceBlockEntity.MAX_RINGS) {
                 RingCfg c = new RingCfg();
                 c.radius = String.format("%.2f", 0.8 + RINGS.size() * 0.3);
                 c.angle = String.valueOf((RINGS.size() * 60) % 360);
+                // 自动给不同颜色
+                int[] palette = {0x66DDFF, 0xCC66FF, 0xFFD966, 0x66FF88, 0xFF6666, 0xFFFFFF};
+                c.color = palette[RINGS.size() % palette.length];
                 RINGS.add(c);
-                // 滚动到末尾
                 scroll = Math.max(0, RINGS.size() - VISIBLE_ROWS);
                 buildRows();
             }
-        }).bounds(px + 300, py + 8, 100, ROW_H)
+        }).bounds(px + 340, py + 12, 110, 20)
                 .tooltip(Tooltip.create(Component.literal("上限 " + WardSourceBlockEntity.MAX_RINGS + " 圈")))
                 .build());
 
-        // 滚动按钮
+        /* 翻页 */
         addRenderableWidget(Button.builder(Component.literal("▲"), b -> {
             if (scroll > 0) { scroll--; buildRows(); }
-        }).bounds(px + 14, startY - 22, 22, ROW_H).build());
+        }).bounds(px + 14, startY - 26, 22, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("▼"), b -> {
             if (scroll + VISIBLE_ROWS < RINGS.size()) { scroll++; buildRows(); }
-        }).bounds(px + 40, startY - 22, 22, ROW_H).build());
+        }).bounds(px + 40, startY - 26, 22, 18).build());
 
-        // 行
         int shown = Math.min(VISIBLE_ROWS, Math.max(0, RINGS.size() - scroll));
+
         for (int vi = 0; vi < shown; vi++) {
-            int ri = scroll + vi;
-            int y = startY + vi * (ROW_H + ROW_GAP);
+            final int ri = scroll + vi;
+            final RingCfg cfg = RINGS.get(ri);
+            int y = startY + vi * ROW_GAP * 2;
 
-            RingCfg cfg = RINGS.get(ri);
-
-            // 删除按钮
+            // ---------- 第一排：删除 / 物品 / 半径 / 速度 / 角度 / 倾角 ----------
             addRenderableWidget(Button.builder(Component.literal("×"), b -> {
                 if (ri < RINGS.size()) {
                     RINGS.remove(ri);
                     if (scroll > 0 && scroll >= RINGS.size()) scroll = Math.max(0, RINGS.size() - 1);
                     buildRows();
                 }
-            }).bounds(px + 14, y, ROW_H, ROW_H)
+            }).bounds(px + 14, y, 20, ROW_H)
                     .tooltip(Tooltip.create(Component.literal("删除这一圈")))
                     .build());
 
-            // 物品按钮
             addRenderableWidget(Button.builder(Component.literal(""), b ->
                     minecraft.setScreen(new ItemPickerScreen(this, ri)))
-                    .bounds(px + 40, y, ROW_H, ROW_H)
-                    .tooltip(Tooltip.create(Component.literal("点击选择物品")))
+                    .bounds(px + 38, y, 20, ROW_H)
+                    .tooltip(Tooltip.create(Component.literal("选择物品")))
                     .build());
 
-            EditBox[] boxes = new EditBox[4];
+            addEdit(px + 86, y, 52, cfg.radius, "半径", "距中心距离", v -> cfg.radius = v);
+            addEdit(px + 142, y, 52, cfg.speed, "速度", "度/tick，可正可负", v -> cfg.speed = v);
+            addEdit(px + 198, y, 52, cfg.angle, "角度", "起始角度，可正可负", v -> cfg.angle = v);
+            addEdit(px + 254, y, 52, cfg.tilt, "倾角", "倾角，可正可负", v -> cfg.tilt = v);
 
-            boxes[0] = new EditBox(this.font, px + 90, y, 52, ROW_H, Component.literal("半径"));
-            boxes[0].setValue(cfg.radius);
-            boxes[0].setTooltip(Tooltip.create(Component.literal("距中心距离（方块）")));
-            boxes[0].setResponder(v -> cfg.radius = v);
-            addRenderableWidget(boxes[0]);
+            // ---------- 第二排：颜色 / 透明度 / 线宽 / 样式 / 间距 ----------
+            int y2 = y + ROW_H + 4;
 
-            boxes[1] = new EditBox(this.font, px + 148, y, 52, ROW_H, Component.literal("速度"));
-            boxes[1].setValue(cfg.speed);
-            boxes[1].setTooltip(Tooltip.create(Component.literal("度/tick，可正可负")));
-            boxes[1].setResponder(v -> cfg.speed = v);
-            addRenderableWidget(boxes[1]);
+            // 颜色按钮（显示当前色）
+            addRenderableWidget(Button.builder(Component.literal("颜色"), b ->
+                    minecraft.setScreen(new ColorPickerScreen(this, cfg.color,
+                            parse(cfg.alpha, 0.55f), (rgb, a) -> {
+                        cfg.color = rgb;
+                        cfg.alpha = String.format("%.2f", a);
+                    })))
+                    .bounds(px + 38, y2, 40, ROW_H)
+                    .tooltip(Tooltip.create(Component.literal("点击打开颜色轮盘")))
+                    .build());
 
-            boxes[2] = new EditBox(this.font, px + 206, y, 52, ROW_H, Component.literal("角度"));
-            boxes[2].setValue(cfg.angle);
-            boxes[2].setTooltip(Tooltip.create(Component.literal("起始角度，可正可负")));
-            boxes[2].setResponder(v -> cfg.angle = v);
-            addRenderableWidget(boxes[2]);
+            addEdit(px + 82, y2, 46, cfg.alpha, "透明度", "0 ~ 1", v -> cfg.alpha = v);
+            addEdit(px + 132, y2, 54, cfg.width, "线宽", "方块单位，如 0.03", v -> cfg.width = v);
 
-            boxes[3] = new EditBox(this.font, px + 264, y, 52, ROW_H, Component.literal("倾角"));
-            boxes[3].setValue(cfg.tilt);
-            boxes[3].setTooltip(Tooltip.create(Component.literal("倾角，可正可负")));
-            boxes[3].setResponder(v -> cfg.tilt = v);
-            addRenderableWidget(boxes[3]);
+            // 样式按钮（循环切换）
+            addRenderableWidget(Button.builder(styleText(cfg.style), b -> {
+                cfg.style = (cfg.style + 1) % 3;
+                b.setMessage(styleText(cfg.style));
+                buildRows();
+            }).bounds(px + 190, y2, 76, ROW_H)
+                    .tooltip(Tooltip.create(Component.literal("连续 → 拖尾 → 虚线")))
+                    .build());
 
-            rowBoxes.add(boxes);
+            addEdit(px + 270, y2, 52, cfg.spacing, "间距", "虚线/拖尾间距", v -> cfg.spacing = v);
         }
 
-        // 底部
-        int by = py + 40 + VISIBLE_ROWS * (ROW_H + ROW_GAP) + 8;
-
+        /* 底部 */
+        int by = startY + VISIBLE_ROWS * ROW_GAP * 2 + 4;
         addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
             minecraft.setScreen(parent);
-        }).bounds(px + 150, by, 80, ROW_H).build());
-
+        }).bounds(px + 160, by, 80, 20).build());
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
-            // 取消：从 BE 重新加载
-            if (parent instanceof WardConfigScreen) {
-                DisplaySettingsScreen.loadFrom(WardConfigScreen.lastBE);
+            if (WardConfigScreen.lastBE != null) {
                 RingSettingsScreen.loadFrom(WardConfigScreen.lastBE);
             }
             minecraft.setScreen(parent);
-        }).bounds(px + 236, by, 80, ROW_H).build());
+        }).bounds(px + 246, by, 80, 20).build());
+    }
+
+    private void addEdit(int x, int y, int w, String value, String label,
+                         String tip, java.util.function.Consumer<String> setter) {
+        EditBox box = new EditBox(this.font, x, y, w, ROW_H, Component.literal(label));
+        box.setValue(value);
+        box.setTooltip(Tooltip.create(Component.literal(tip)));
+        box.setResponder(setter);
+        addRenderableWidget(box);
+    }
+
+    private Component styleText(int style) {
+        switch (style) {
+            case 1: return Component.literal("拖尾");
+            case 2: return Component.literal("虚线");
+            default: return Component.literal("连续");
+        }
     }
 
     @Override
@@ -243,49 +255,55 @@ public class RingSettingsScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int panelH = 40 + VISIBLE_ROWS * (ROW_H + ROW_GAP) + 40;
+        int panelH = 50 + VISIBLE_ROWS * ROW_GAP * 2 + 40;
         gg.fill(px, py, px + PANEL_W, py + panelH, 0xC0000000);
 
         gg.drawCenteredString(this.font, "星环设置（共 " + RINGS.size() + " 圈）",
-                px + PANEL_W / 2, py + 12, 0xFFD700);
+                px + PANEL_W / 2, py + 14, 0xFFD700);
 
-        int startY = py + 40;
+        int startY = py + 50;
 
         // 表头
-        gg.drawString(this.font, "物品", px + 44, startY - 22 + 6, 0xAAAAAA);
-        gg.drawString(this.font, "半径", px + 90, startY - 22 + 6, 0xAAAAAA);
-        gg.drawString(this.font, "速度", px + 148, startY - 22 + 6, 0xAAAAAA);
-        gg.drawString(this.font, "角度", px + 206, startY - 22 + 6, 0xAAAAAA);
-        gg.drawString(this.font, "倾角", px + 264, startY - 22 + 6, 0xAAAAAA);
+        int hy = startY - 22;
+        gg.drawString(this.font, "物品", px + 38, hy, 0xAAAAAA);
+        gg.drawString(this.font, "半径", px + 86, hy, 0xAAAAAA);
+        gg.drawString(this.font, "速度", px + 142, hy, 0xAAAAAA);
+        gg.drawString(this.font, "角度", px + 198, hy, 0xAAAAAA);
+        gg.drawString(this.font, "倾角", px + 254, hy, 0xAAAAAA);
 
         int shown = Math.min(VISIBLE_ROWS, Math.max(0, RINGS.size() - scroll));
 
         if (RINGS.isEmpty()) {
-            gg.drawCenteredString(this.font, "§7还没有任何环，点右上角「+ 添加一圈」",
+            gg.drawCenteredString(this.font, "§7还没有任何圈，点右上角「+ 添加一圈」",
                     px + PANEL_W / 2, startY + 40, 0x888888);
         }
 
         for (int vi = 0; vi < shown; vi++) {
             int ri = scroll + vi;
-            int y = startY + vi * (ROW_H + ROW_GAP);
+            RingCfg c = RINGS.get(ri);
+            int y = startY + vi * ROW_GAP * 2;
+            int y2 = y + ROW_H + 4;
 
-            // 环序号
-            gg.drawString(this.font, String.valueOf(ri + 1), px + 78, y + 6, 0x888888);
+            // 序号
+            gg.drawString(this.font, String.valueOf(ri + 1), px + 62, y + 7, 0x888888);
 
             // 物品槽
-            gg.fill(px + 39, y - 1, px + 61, y + ROW_H + 1, 0xFF3A3A3A);
-            ItemStack st = RINGS.get(ri).item;
-            if (!st.isEmpty()) {
-                gg.renderItem(st, px + 42, y + 2);
+            gg.fill(px + 37, y - 1, px + 59, y + ROW_H + 1, 0xFF3A3A3A);
+            if (!c.item.isEmpty()) {
+                gg.renderItem(c.item, px + 40, y + 3);
             } else {
-                gg.drawCenteredString(this.font, "§8空", px + 50, y + 6, 0x666666);
+                gg.drawCenteredString(this.font, "§8空", px + 48, y + 7, 0x666666);
             }
+
+            // 颜色预览块
+            gg.fill(px + 14, y2, px + 34, y2 + ROW_H, 0xFF000000 | c.color);
         }
 
         // 滚动提示
         if (RINGS.size() > VISIBLE_ROWS) {
-            String info = "显示 " + (scroll + 1) + "-" + (scroll + shown) + " / " + RINGS.size();
-            gg.drawString(this.font, "§7" + info, px + 320, startY + VISIBLE_ROWS * (ROW_H + ROW_GAP) - 12, 0x888888);
+            gg.drawString(this.font, "§7显示 " + (scroll + 1) + "-" + (scroll + shown)
+                            + " / " + RINGS.size(),
+                    px + 330, startY - 20, 0x888888);
         }
     }
 

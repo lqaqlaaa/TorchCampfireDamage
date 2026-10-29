@@ -26,7 +26,8 @@ public record UpdateOrbitPayload(
 ) implements CustomPacketPayload {
 
     /** 单环数据 */
-    public record RingData(ItemStack item, float radius, float speed, float angle, float tilt) {}
+    public record RingData(ItemStack item, float radius, float speed, float angle, float tilt,
+                           int color, float alpha, float width, int style, float spacing) {}
 
     public static final ResourceLocation ID =
             ResourceLocation.fromNamespaceAndPath(TorchCampfireDamage.MOD_ID, "update_orbit");
@@ -50,7 +51,12 @@ public record UpdateOrbitPayload(
                         float s = buf.readFloat();
                         float a = buf.readFloat();
                         float t = buf.readFloat();
-                        arr[i] = new RingData(st, r, s, a, t);
+                        int col = buf.readVarInt();
+                        float al = buf.readFloat();
+                        float wd = buf.readFloat();
+                        int sty = buf.readVarInt();
+                        float sp = buf.readFloat();
+                        arr[i] = new RingData(st, r, s, a, t, col, al, wd, sty, sp);
                     }
                     return new UpdateOrbitPayload(pos, vis, centerIt, cScale, cSpin, arr);
                 }
@@ -72,6 +78,11 @@ public record UpdateOrbitPayload(
                         buf.writeFloat(rd == null ? 2.0f : rd.speed());
                         buf.writeFloat(rd == null ? 0f : rd.angle());
                         buf.writeFloat(rd == null ? 0f : rd.tilt());
+                        buf.writeVarInt(rd == null ? 0x66DDFF : rd.color());
+                        buf.writeFloat(rd == null ? 0.55f : rd.alpha());
+                        buf.writeFloat(rd == null ? 0.03f : rd.width());
+                        buf.writeVarInt(rd == null ? 0 : rd.style());
+                        buf.writeFloat(rd == null ? 0.35f : rd.spacing());
                     }
                 }
             };
@@ -109,6 +120,11 @@ public record UpdateOrbitPayload(
                     ring.speed = rd.speed();
                     ring.angle = rd.angle();   // 可正可负，不限制
                     ring.tilt = rd.tilt();
+                    ring.color = rd.color();
+                    ring.alpha = rd.alpha();
+                    ring.width = rd.width();
+                    ring.style = rd.style();
+                    ring.spacing = rd.spacing();
                 }
                 ward.setRing(i, ring);
             }

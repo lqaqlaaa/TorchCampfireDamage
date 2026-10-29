@@ -53,6 +53,18 @@ public class WardSourceBlockEntity extends BlockEntity {
         public float angle;
         public float tilt;
 
+        /* ===== 轨迹外观 ===== */
+        /** 颜色（0xRRGGBB） */
+        public int color = 0x66DDFF;
+        /** 透明度 0~1 */
+        public float alpha = 0.55f;
+        /** 线宽（方块单位） */
+        public float width = 0.030f;
+        /** 轨迹样式：0=连续环, 1=拖尾, 2=虚线 */
+        public int style = 0;
+        /** 虚线/拖尾的间距系数（0.05~1.0） */
+        public float spacing = 0.35f;
+
         public Ring() {
             this.item = net.minecraft.world.item.ItemStack.EMPTY;
             this.radius = 0.8f;
@@ -68,6 +80,11 @@ public class WardSourceBlockEntity extends BlockEntity {
             r.speed = this.speed;
             r.angle = this.angle;
             r.tilt = this.tilt;
+            r.color = this.color;
+            r.alpha = this.alpha;
+            r.width = this.width;
+            r.style = this.style;
+            r.spacing = this.spacing;
             return r;
         }
     }
@@ -307,6 +324,11 @@ public class WardSourceBlockEntity extends BlockEntity {
             c.putFloat("speed", r.speed);
             c.putFloat("angle", r.angle);
             c.putFloat("tilt", r.tilt);
+            c.putInt("color", r.color);
+            c.putFloat("alpha", r.alpha);
+            c.putFloat("width", r.width);
+            c.putInt("style", r.style);
+            c.putFloat("spacing", r.spacing);
             ringList.add(c);
         }
         tag.put("rings", ringList);
@@ -346,6 +368,11 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (c.contains("speed")) r.speed = c.getFloat("speed");
                 if (c.contains("angle")) r.angle = c.getFloat("angle");
                 if (c.contains("tilt")) r.tilt = c.getFloat("tilt");
+                if (c.contains("color")) r.color = c.getInt("color");
+                if (c.contains("alpha")) r.alpha = c.getFloat("alpha");
+                if (c.contains("width")) r.width = c.getFloat("width");
+                if (c.contains("style")) r.style = c.getInt("style");
+                if (c.contains("spacing")) r.spacing = c.getFloat("spacing");
                 rings.add(r);
             }
         }

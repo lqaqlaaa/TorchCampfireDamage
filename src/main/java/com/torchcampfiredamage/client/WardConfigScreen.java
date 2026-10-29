@@ -258,7 +258,8 @@ public class WardConfigScreen extends Screen {
         for (int i = 0; i < ringCount; i++) {
             var r = beanRings.get(i);
             ringData[i] = new com.torchcampfiredamage.network.UpdateOrbitPayload.RingData(
-                    r.item, r.radius, r.speed, r.angle, r.tilt);
+                    r.item, r.radius, r.speed, r.angle, r.tilt,
+                    r.color, r.alpha, r.width, r.style, r.spacing);
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.torchcampfiredamage.network.UpdateOrbitPayload(
