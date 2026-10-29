@@ -20,10 +20,10 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 
 /**
- * 魔法球 + 星环渲染。
+ * 中心旋转物品 + 星环渲染。
  * <p>
- * 中心是一个岩浆球（由方块模型提供），周围最多 5 个环，
- * 每个环有自己的物品、旋转速度、起始角度、半径和倾角。
+ * 中心是一个自转的悬浮物品；周围最多 5 个环，
+ * 每环有独立的物品、半径、速度、起始角度、倾角。
  */
 public class OrbitRenderHandler {
 
@@ -52,21 +52,17 @@ public class OrbitRenderHandler {
             var level = Minecraft.getInstance().level;
             float time = (level == null ? 0 : level.getGameTime()) + partialTick;
 
-            // 球心：方块中心，略偏上
             final double cy = 0.5;
-
-            int visibleCount = 0;
 
             // ===== 中心物品 =====
             ItemStack center = be.getCenterItem();
+            if (center != null && !center.isEmpty()) {
                 pose.pushPose();
                 pose.translate(0.5, cy, 0.5);
 
-                // 中心物品也轻轻上下浮动
                 float cbob = Mth.sin(time * 0.08f) * 0.03f;
                 pose.translate(0, cbob, 0);
 
-                // 自转
                 pose.mulPose(Axis.YP.rotationDegrees(time * be.getCenterSpin()));
 
                 float cs = be.getCenterScale();
@@ -77,31 +73,27 @@ public class OrbitRenderHandler {
                 pose.popPose();
             }
 
-            // 逐环渲染
+            // ===== 逐环渲染 =====
             for (int ri = 0; ri < WardSourceBlockEntity.MAX_RINGS; ri++) {
                 WardSourceBlockEntity.Ring ring = be.getRing(ri);
                 ItemStack item = ring.item;
                 if (item == null || item.isEmpty()) continue;
-
-                visibleCount++;
 
                 float radius = ring.radius;
                 float speed = ring.speed;
                 float baseAngle = ring.angle;
                 float tilt = ring.tilt;
 
-                // 当前角度（度）
                 float cur = baseAngle + time * speed;
 
                 pose.pushPose();
                 pose.translate(0.5, cy, 0.5);
 
-                // 环的倾角
                 if (tilt != 0f) {
                     pose.mulPose(Axis.XP.rotationDegrees(tilt));
                 }
 
-                // 环轨迹（半透明圆环）
+                // 环轨迹
                 drawRing(pose, buffers, radius, ri);
 
                 // 物品位置
@@ -112,11 +104,9 @@ public class OrbitRenderHandler {
                 pose.pushPose();
                 pose.translate(ox, 0, oz);
 
-                // 轻微浮动
                 float bob = Mth.sin((time + ri * 7) * 0.12f) * 0.045f;
                 pose.translate(0, bob, 0);
 
-                // 自转
                 pose.mulPose(Axis.YP.rotationDegrees(cur * 1.5f));
                 pose.scale(0.42f, 0.42f, 0.42f);
 
@@ -137,7 +127,6 @@ public class OrbitRenderHandler {
 
             var mat = pose.last().pose();
 
-            // 每环一个颜色（青→紫→金→绿→红）
             float[][] COLORS = {
                     {0.55f, 0.88f, 1.00f},
                     {0.75f, 0.60f, 1.00f},
