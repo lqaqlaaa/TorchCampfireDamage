@@ -170,18 +170,24 @@ public class WardConfigScreen extends Screen {
             Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
         }).bounds(bx0 + bw + gap, by1, bw, 20).build());
 
-        // 星环设置（独立界面）
-        addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
-            RingSettingsScreen.loadFrom(be);
-            Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
-        }).bounds(bx0 + (bw + gap) * 2, by2, bw, 20).build());
-
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
                 .bounds(bx0 + (bw + gap) * 2, by1, bw, 20).build());
 
-        // 第二行：取消（居中）
+        // 第二行：星环设置 / 全局设置 / 取消
+        addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
+            RingSettingsScreen.loadFrom(be);
+            Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
+        }).bounds(bx0, by2, bw, 20).build());
+
+        addRenderableWidget(Button.builder(Component.literal("全局设置"), b ->
+                Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this)))
+                .bounds(bx0 + bw + gap, by2, bw, 20)
+                .tooltip(Tooltip.create(Component.literal(
+                        "全局配置：忽略命名生物、传送、播报、副手火把等")))
+                .build());
+
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
-                .bounds(cx - bw / 2, by2, bw, 20).build());
+                .bounds(bx0 + (bw + gap) * 2, by2, bw, 20).build());
 
         this._left = left;
         this._right = right;

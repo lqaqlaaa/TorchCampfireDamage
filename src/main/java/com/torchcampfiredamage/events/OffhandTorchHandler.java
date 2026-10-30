@@ -86,21 +86,25 @@ public class OffhandTorchHandler {
                     (double) (cz + chunkRadius + 1) * CHUNK);
 
             boolean announce, glowing, slow, tpDrops, tpXp;
+            boolean ignoreNamed;
             try {
                 announce = ModConfig.OFFHAND_ANNOUNCE.get();
                 glowing = ModConfig.OFFHAND_GLOWING.get();
                 slow = ModConfig.OFFHAND_SLOW.get();
                 tpDrops = ModConfig.OFFHAND_TELEPORT_DROPS.get();
                 tpXp = ModConfig.OFFHAND_TELEPORT_XP.get();
+                ignoreNamed = ModConfig.IGNORE_NAMED_MOBS.get();
             } catch (Throwable t) {
                 announce = false; glowing = false; slow = false;
-                tpDrops = false; tpXp = false;
+                tpDrops = false; tpXp = false; ignoreNamed = true;
             }
 
             Set<UUID> done = new HashSet<>();
 
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
                 if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
+                // 与方块火把一致：跳过被命名的生物（白名单保护）
+                if (ignoreNamed && mob.hasCustomName()) continue;
                 if (!isHostile(mob)) continue;
 
                 if (glowing) mob.setGlowingTag(true);
