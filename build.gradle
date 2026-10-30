@@ -22,6 +22,11 @@ repositories {
         name = 'NeoForged'
         url = 'https://maven.neoforged.net/releases'
     }
+    // Curios API（饰品栏）
+    maven {
+        name = 'IllusiveC4'
+        url = 'https://maven.theillusivec4.top/'
+    }
 }
 
 neoForge {
@@ -41,6 +46,12 @@ neoForge {
             sourceSet sourceSets.main
         }
     }
+}
+
+dependencies {
+    // Curios API —— 饰品栏支持（1.21.1 NeoForge）
+    compileOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
+    runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
 }
 
 tasks.withType(JavaCompile).configureEach {

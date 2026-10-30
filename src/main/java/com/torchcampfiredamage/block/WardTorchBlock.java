@@ -15,39 +15,32 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * 守卫火把 —— 独立放置的方块。
+ * 守卫火把 —— 独立放置的方块（可穿透）。
  * <p>
- * 特性：
- * <ul>
- *   <li>不再依附于其他方块，可放在任意位置</li>
- *   <li>无碰撞（生物可以穿过）</li>
- *   <li>选取/碰撞箱为完整 1×1×1 方块范围（方便点击和瞄准）</li>
- *   <li>自带光源</li>
- *   <li>外观完全由 BlockEntityRenderer 绘制（中心物品 + 星环）</li>
- * </ul>
+ * 重要：不再覆写 getCollisionShape()，完全交给 Properties.noCollission() 处理，
+ * 这与原版火把「可穿过」的实现方式一致。
+ * 只覆写 getShape() 让瞄准框是完整 1×1。
  */
 public class WardTorchBlock extends Block implements EntityBlock {
 
-    /** 1×1×1 完整方块形状 */
-    private static final VoxelShape SHAPE = Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+    /** 瞄准框：完整 1×1×1（只用于射线检测，不参与物理碰撞） */
+    private static final VoxelShape AIM_SHAPE = Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
 
     public WardTorchBlock(Properties props) {
         super(props);
     }
 
-    /** 碰撞箱 / 选取箱：完整 1×1×1 */
+    /** 瞄准/选取框：完整 1×1（射线检测用） */
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return SHAPE;
+        return AIM_SHAPE;
     }
 
-    @Override
-    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        // 关键：碰撞形状为空 → 生物可以穿过
-        return Shapes.empty();
-    }
+    // 注意：不要覆写 getCollisionShape()
+    // Properties.noCollission() 已经把它设成 Shapes.empty()，
+    // 手动覆写反而可能导致某些情况下碰撞判定异常。
 
-    /** 光线穿透：不遮挡视线（像玻璃那样不阻挡光，但可见） */
+    /** 不遮挡视线 */
     @Override
     public VoxelShape getVisualShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
         return Shapes.empty();

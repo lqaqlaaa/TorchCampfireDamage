@@ -65,5 +65,9 @@ public class TorchCampfireDamage {
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(ModBlocks.WARD_TORCH_ITEM.get());
         }
+        // 护符放进"杂项/工具"类标签，方便创造模式获取
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(ModBlocks.WARD_CHARM_ITEM.get());
+        }
     }
 }

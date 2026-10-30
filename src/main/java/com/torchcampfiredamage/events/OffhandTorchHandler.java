@@ -57,7 +57,14 @@ public class OffhandTorchHandler {
 
             // 副手必须是守卫火把
             ItemStack off = sp.getItemInHand(InteractionHand.OFF_HAND);
-            if (off.isEmpty() || !off.is(ModBlocks.WARD_TORCH_ITEM.get())) {
+            // 生效条件（任一满足即可）：
+            //   1) 副手持守卫护符
+            //   2) 副手持守卫火把（不影响方块放置）
+            //   3) Curios 饰品栏里装备了守卫护符
+            boolean isCharm = !off.isEmpty() && off.is(ModBlocks.WARD_CHARM_ITEM.get());
+            boolean isTorch = !off.isEmpty() && off.is(ModBlocks.WARD_TORCH_ITEM.get());
+            boolean hasCurioCharm = hasCharmEquipped(sp);
+            if (!isCharm && !isTorch && !hasCurioCharm) {
                 lastTime.remove(sp.getUUID());
                 continue;
             }
@@ -120,6 +127,23 @@ public class OffhandTorchHandler {
                             "§6[副手火把] §e" + mob.getName().getString() + "§7 被烧死了"));
                 }
             }
+        }
+    }
+
+    /**
+     * 检查玩家的 Curios 饰品栏里是否装备了守卫护符。
+     * <p>
+     * 只有在 Curios 存在时才会执行到实际逻辑；用 try/catch 兜底，
+     * 避免饰品栏为空或 API 版本差异导致整个 tick 逻辑崩掉。
+     */
+    private static boolean hasCharmEquipped(ServerPlayer player) {
+        try {
+            var handler = top.theillusivec4.curios.api.CuriosApi
+                    .getCuriosInventory(player).orElse(null);
+            if (handler == null) return false;
+            return handler.findFirstCurio(ModBlocks.WARD_CHARM_ITEM.get()).isPresent();
+        } catch (Throwable t) {
+            return false;
         }
     }
 

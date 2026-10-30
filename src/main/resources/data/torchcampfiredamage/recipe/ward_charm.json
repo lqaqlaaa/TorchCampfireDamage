@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "torchcampfiredamage:ward_torch" }
+  ],
+  "result": {
+    "id": "torchcampfiredamage:ward_charm",
+    "count": 1
+  }
+}

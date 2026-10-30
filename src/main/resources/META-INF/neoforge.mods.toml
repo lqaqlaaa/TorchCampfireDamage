@@ -23,3 +23,10 @@ type="required"
 versionRange="[1.21.1,1.22)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.torchcampfiredamage]]
+modId="curios"
+type="required"
+versionRange="[9.0,)"
+ordering="AFTER"
+side="BOTH"
