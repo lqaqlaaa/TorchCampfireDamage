@@ -26,7 +26,8 @@ public record UpdateWardPayload(
         boolean slow,
         boolean announce,
         boolean teleportDrops,
-        boolean teleportXp
+        boolean teleportXp,
+        boolean ignoreNamed
 ) implements CustomPacketPayload {
 
     public static final ResourceLocation ID =
@@ -40,16 +41,17 @@ public record UpdateWardPayload(
                 public UpdateWardPayload decode(RegistryFriendlyByteBuf buf) {
                     return new UpdateWardPayload(
                             buf.readBlockPos(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readVarInt(),
-                            buf.readDouble(),
-                            buf.readVarInt(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean(),
-                            buf.readBoolean()
+                            buf.readBoolean(),   // enabled
+                            buf.readBoolean(),   // chunkMode
+                            buf.readVarInt(),    // range
+                            buf.readDouble(),    // damage
+                            buf.readVarInt(),    // interval
+                            buf.readBoolean(),   // glowing
+                            buf.readBoolean(),   // slow
+                            buf.readBoolean(),   // announce
+                            buf.readBoolean(),   // teleportDrops
+                            buf.readBoolean(),   // teleportXp
+                            buf.readBoolean()    // ignoreNamed
                     );
                 }
 
@@ -66,6 +68,7 @@ public record UpdateWardPayload(
                     buf.writeBoolean(p.announce());
                     buf.writeBoolean(p.teleportDrops());
                     buf.writeBoolean(p.teleportXp());
+                    buf.writeBoolean(p.ignoreNamed());
                 }
             };
 
@@ -88,7 +91,8 @@ public record UpdateWardPayload(
             if (!(be instanceof WardSourceBlockEntity ward)) return;
 
             ward.applyAll(p.enabled(), p.chunkMode(), p.range(), p.damage(), p.interval(),
-                    p.glowing(), p.slow(), p.announce(), p.teleportDrops(), p.teleportXp());
+                    p.glowing(), p.slow(), p.announce(), p.teleportDrops(), p.teleportXp(),
+                    p.ignoreNamed());
         });
     }
 }

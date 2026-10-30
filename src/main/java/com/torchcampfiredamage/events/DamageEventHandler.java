@@ -227,7 +227,8 @@ public class DamageEventHandler {
         boolean tpXp = ward.isTeleportXp();
 
         boolean countAsKill = safeGet(ModConfig.COUNT_AS_PLAYER_KILL::get, true);
-        boolean ignoreNamed = safeGet(ModConfig.IGNORE_NAMED_MOBS::get, true);
+        // 命名生物白名单：优先使用本火把自己的设置（右键界面可单独调整）
+        boolean ignoreNamed = ward.isIgnoreNamed();
 
         // 大范围保护：AABB 过大时改用「按区块分段查询」，避免单次查询扫描过多 section
         java.util.List<Mob> candidates;

@@ -329,14 +329,18 @@ public class RingSettingsScreen extends Screen {
 
     private void buildFooter() {
         int cx = this.width / 2;
-        int bw = Math.min(76, (this.width - 40) / 2);
+        int bw = Math.max(56, Math.min(84, (this.width - 32) / 2));
         int gap = 8;
-        int by = this.height - 30;
+        int by = this.height - 24;
 
-        addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
+        // 保存并返回：直接写回服务端，不需要退回主界面再点保存
+        addRenderableWidget(Button.builder(Component.literal("保存并返回"), b -> {
             pushToServer();
+            WardConfigScreen.saveNow();
             minecraft.setScreen(parent);
-        }).bounds(cx - bw - gap / 2, by, bw, 20).build());
+        }).bounds(cx - bw - gap / 2, by, bw, 20)
+                .tooltip(Tooltip.create(Component.literal("保存星环设置并返回上一级")))
+                .build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
             if (WardConfigScreen.lastBE != null) {

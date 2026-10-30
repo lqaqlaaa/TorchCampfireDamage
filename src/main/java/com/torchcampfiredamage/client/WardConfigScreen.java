@@ -32,6 +32,8 @@ public class WardConfigScreen extends Screen {
     private boolean announce;
     private boolean dropTeleport;
     private boolean xpTeleport;
+    /** 本火把是否忽略被命名的生物（白名单） */
+    private boolean ignoreNamed;
     private boolean showRange;
     /** 输入框的「工作值」：init() 重建时以它为准，避免从子界面返回被 BE 覆盖 */
     private String rangeText;
@@ -59,6 +61,7 @@ public class WardConfigScreen extends Screen {
         this.announce = be.isAnnounce();
         this.dropTeleport = be.isTeleportDrops();
         this.xpTeleport = be.isTeleportXp();
+        this.ignoreNamed = be.isIgnoreNamed();
         this.showRange = (Minecraft.getInstance().level != null)
                 && RangeOverlay.has(Minecraft.getInstance().level.dimension(), pos);
         this.rangeText = String.valueOf(be.isChunkMode() ? be.getChunkRadius() : be.getBlockRadius());
@@ -68,11 +71,12 @@ public class WardConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        activeInstance = this;
         int cx = this.width / 2;
         int left = cx - 160;
         int right = cx + 10;
-        // 内容总高约 5 行 + 2 行按钮 ≈ 190，确保不超出屏幕
-        int contentH = ROW_H * 5 + 60;
+        // 内容总高约 6 行 + 2 行按钮
+        int contentH = ROW_H * 6 + 60;
         int top = Math.max(8, (this.height - contentH) / 2);
         int y = top;
 
@@ -150,12 +154,22 @@ public class WardConfigScreen extends Screen {
         }).bounds(right, ry, BTN_W, 20).build());
         ry += ROW_H;
 
+        // 忽略命名生物（白名单）—— 本火把独立设置
+        addRenderableWidget(Button.builder(onOffText(ignoreNamed), b -> {
+            ignoreNamed = !ignoreNamed;
+            b.setMessage(onOffText(ignoreNamed));
+        }).bounds(right, ry, BTN_W, 20)
+                .tooltip(Tooltip.create(Component.literal(
+                        "开 = 被命名的生物不会受伤\n只影响这一只火把")))
+                .build());
+        ry += ROW_H;
+
         // ---- 底部按钮区（两行三列，居中）----
         int bw = 88;      // 按钮宽
         int gap = 6;      // 间距
         int totalW = bw * 3 + gap * 2;
         int bx0 = cx - totalW / 2;
-        int by1 = top + ROW_H * 5 + 16;
+        int by1 = top + ROW_H * 6 + 16;
         int by2 = by1 + 24;
 
         // 第一行：显示范围 / 显示设置 / 保存
@@ -269,6 +283,31 @@ public class WardConfigScreen extends Screen {
     }
 
     private void save() {
+        saveNow();
+        updateOverlay();
+        onClose();
+    }
+
+    /**
+     * 立即把当前界面 + 子界面（星环 / 显示）的所有设置保存到服务端。
+     * <p>
+     * 供子界面直接调用，这样在子界面里改完就能立刻保存，不必退回主界面。
+     */
+    public static void saveNow() {
+        if (lastBE == null) return;
+        WardConfigScreen inst = activeInstance;
+        if (inst != null) {
+            inst.saveInternal();
+        } else {
+            // 没有主界面实例时（理论上不会发生），只同步星环部分
+            sendOrbit(lastBE.getBlockPos());
+        }
+    }
+
+    /** 当前打开的主界面实例（供静态保存用） */
+    private static WardConfigScreen activeInstance;
+
+    private void saveInternal() {
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
         double damage = parseDouble(damageBox.getValue(), 2.0);
@@ -276,10 +315,10 @@ public class WardConfigScreen extends Screen {
 
         PacketDistributor.sendToServer(new UpdateWardPayload(
                 pos, enabled, chunkMode, range, damage, interval,
-                glowing, slow, announce, dropTeleport, xpTeleport));
+                glowing, slow, announce, dropTeleport, xpTeleport, ignoreNamed));
 
         be.applyAll(enabled, chunkMode, range, damage, interval,
-                glowing, slow, announce, dropTeleport, xpTeleport);
+                glowing, slow, announce, dropTeleport, xpTeleport, ignoreNamed);
 
         // 同步星环设置到服务端
         var beanRings = RingSettingsScreen.toBeanRings();
@@ -302,7 +341,6 @@ public class WardConfigScreen extends Screen {
                         ringData));
 
         updateOverlay();
-        onClose();
     }
 
     private static float parseF(String s, float def) {
@@ -344,7 +382,7 @@ public class WardConfigScreen extends Screen {
         for (int i = 0; i < leftLabels.length; i++) {
             gg.drawString(this.font, leftLabels[i], _left - 56, _top + i * ROW_H + 6, 0xFFFFFF);
         }
-        String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验"};
+        String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物"};
         for (int i = 0; i < rightLabels.length; i++) {
             gg.drawString(this.font, rightLabels[i], _right - 56, _top + i * ROW_H + 6, 0xFFFFFF);
         }

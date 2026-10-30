@@ -34,6 +34,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean announce = true;
     private boolean teleportDrops = true;
     private boolean teleportXp = true;
+    /** 是否忽略被命名的生物（白名单保护），本火把独立开关 */
+    private boolean ignoreNamed = true;
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -163,6 +165,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isAnnounce() { return announce; }
     public boolean isTeleportDrops() { return teleportDrops; }
     public boolean isTeleportXp() { return teleportXp; }
+    public boolean isIgnoreNamed() { return ignoreNamed; }
+    public void setIgnoreNamed(boolean v) { this.ignoreNamed = v; setChanged(); }
 
     /**
      * 放置时用配置文件里的「默认参数」初始化本方块。
@@ -182,6 +186,8 @@ public class WardSourceBlockEntity extends BlockEntity {
             this.announce = com.torchcampfiredamage.config.ModConfig.DEFAULT_ANNOUNCE.get();
             this.teleportDrops = com.torchcampfiredamage.config.ModConfig.DEFAULT_TELEPORT_DROPS.get();
             this.teleportXp = com.torchcampfiredamage.config.ModConfig.DEFAULT_TELEPORT_XP.get();
+            // 命名生物白名单：用全局配置作为新火把的默认值
+            this.ignoreNamed = com.torchcampfiredamage.config.ModConfig.IGNORE_NAMED_MOBS.get();
             setChanged();
         } catch (Throwable ignored) {
             // 配置未加载时保持字段默认值
@@ -281,7 +287,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     /** 一次性写入全部参数 */
     public void applyAll(boolean enabled, boolean chunkMode, int range, double damage, int interval,
                          boolean glowing, boolean slow, boolean announce,
-                         boolean teleportDrops, boolean teleportXp) {
+                         boolean teleportDrops, boolean teleportXp, boolean ignoreNamed) {
         this.enabled = enabled;
         this.chunkMode = chunkMode;
         if (chunkMode) {
@@ -296,6 +302,7 @@ public class WardSourceBlockEntity extends BlockEntity {
         this.announce = announce;
         this.teleportDrops = teleportDrops;
         this.teleportXp = teleportXp;
+        this.ignoreNamed = ignoreNamed;
         setChanged();
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -319,6 +326,7 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("announce", announce);
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
+        tag.putBoolean("ignoreNamed", ignoreNamed);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -363,6 +371,15 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("announce")) announce = tag.getBoolean("announce");
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
+        // 旧存档没有这个字段时，回落到全局配置
+        if (tag.contains("ignoreNamed")) {
+            ignoreNamed = tag.getBoolean("ignoreNamed");
+        } else {
+            try {
+                ignoreNamed = com.torchcampfiredamage.config.ModConfig.IGNORE_NAMED_MOBS.get();
+            } catch (Throwable ignored) {
+            }
+        }
         if (tag.contains("orbitVisible")) orbitVisible = tag.getBoolean("orbitVisible");
         if (tag.contains("centerScale")) centerScale = tag.getFloat("centerScale");
         if (tag.contains("centerSpin")) centerSpin = tag.getFloat("centerSpin");

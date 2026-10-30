@@ -184,9 +184,9 @@ public class GlobalSettingsScreen extends Screen {
 
     /* ================= 自适应布局计算 ================= */
 
-    /** 预留：标题 22 + 页码 10 + 底部按钮 46 + 边距 */
+    /** 预留：标题 + 页码 + 底部两行按钮 */
     private static final int RESERVED_TOP = 26;
-    private static final int RESERVED_BOTTOM = 50;
+    private static final int RESERVED_BOTTOM = 56;
 
     @Override
     protected void init() {
@@ -266,39 +266,55 @@ public class GlobalSettingsScreen extends Screen {
             allRows.get(i).build(this, x, y);
         }
 
-        /* ---- 底部按钮：翻页 + 恢复默认 + 关闭 ---- */
+        /* ---- 底部按钮：两行，全部保证在屏幕内 ---- */
         int cx = this.width / 2;
-        int by = this.height - RESERVED_BOTTOM + 20;
 
-        int bw = Math.min(80, (this.width - 40) / 3);
+        // 第一行：翻页 + 恢复默认
+        int bw = Math.max(40, Math.min(72, (this.width - 32) / 3));
         int gap = 6;
         int totalBW = bw * 3 + gap * 2;
         int bx0 = cx - totalBW / 2;
 
+        // 从屏幕底部往上排，确保不出界
+        int byClose = this.height - 24;          // 关闭按钮所在行
+        int byMain = byClose - 24;               // 翻页那行
+
         addRenderableWidget(Button.builder(Component.literal("◀"), b -> {
             if (page > 0) { page--; buildPage(); }
-        }).bounds(bx0, by, bw, 20)
+        }).bounds(bx0, byMain, bw, 20)
                 .tooltip(Tooltip.create(Component.literal("上一页")))
                 .build());
 
         addRenderableWidget(Button.builder(Component.literal("恢复默认"), b -> {
             resetToDefaults();
             buildPage();
-        }).bounds(bx0 + bw + gap, by, bw, 20)
+        }).bounds(bx0 + bw + gap, byMain, bw, 20)
                 .tooltip(Tooltip.create(Component.literal("恢复所有全局配置为默认值")))
                 .build());
 
         addRenderableWidget(Button.builder(Component.literal("▶"), b -> {
             if (page + 1 < pageCount) { page++; buildPage(); }
-        }).bounds(bx0 + (bw + gap) * 2, by, bw, 20)
+        }).bounds(bx0 + (bw + gap) * 2, byMain, bw, 20)
                 .tooltip(Tooltip.create(Component.literal("下一页")))
                 .build());
 
-        // 关闭按钮放在最下方居中
-        addRenderableWidget(Button.builder(Component.literal("关闭"), b -> {
+        // 第二行：保存并返回 / 取消
+        int bw2 = Math.max(52, Math.min(88, (this.width - 32) / 2));
+        int gap2 = 8;
+        int bx2 = cx - (bw2 * 2 + gap2) / 2;
+
+        addRenderableWidget(Button.builder(Component.literal("保存并返回"), b -> {
             saveConfig();
             minecraft.setScreen(parent);
-        }).bounds(cx - bw / 2, by + 24, bw, 20).build());
+        }).bounds(bx2, byClose, bw2, 20)
+                .tooltip(Tooltip.create(Component.literal("保存所有修改并返回上一级")))
+                .build());
+
+        addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
+            minecraft.setScreen(parent);
+        }).bounds(bx2 + bw2 + gap2, byClose, bw2, 20)
+                .tooltip(Tooltip.create(Component.literal("不保存，直接返回")))
+                .build());
     }
 
     /* ================= 工具 ================= */
