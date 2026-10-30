@@ -44,14 +44,20 @@ public class WardSourceBlockEntity extends BlockEntity {
      * @param radius    距中心距离（0.3 ~ 3.0 方块）
      * @param speed     旋转速度（度/tick，-20 ~ 20）
      * @param angle     起始角度偏移（0 ~ 360 度）
-     * @param tilt      倾角（0 ~ 90 度，0 = 水平）
+     * @param tiltX     绕 X 轴倾斜（前后倾斜，-180 ~ 180 度）
+     * @param tiltY     绕 Y 轴倾斜（左右偏转，-180 ~ 180 度）
+     * @param tiltZ     绕 Z 轴倾斜（左右倾斜，-180 ~ 180 度）
      */
     public static final class Ring {
         public net.minecraft.world.item.ItemStack item;
         public float radius;
         public float speed;
         public float angle;
+        /** 旧版单轴倾角，仅为兼容旧存档保留，读取时并入 tiltX */
         public float tilt;
+        public float tiltX;
+        public float tiltY;
+        public float tiltZ;
 
         /* ===== 轨迹外观 ===== */
         /** 颜色（0xRRGGBB） */
@@ -71,6 +77,9 @@ public class WardSourceBlockEntity extends BlockEntity {
             this.speed = 2.0f;
             this.angle = 0f;
             this.tilt = 0f;
+            this.tiltX = 0f;
+            this.tiltY = 0f;
+            this.tiltZ = 0f;
         }
 
         public Ring copy() {
@@ -80,6 +89,9 @@ public class WardSourceBlockEntity extends BlockEntity {
             r.speed = this.speed;
             r.angle = this.angle;
             r.tilt = this.tilt;
+            r.tiltX = this.tiltX;
+            r.tiltY = this.tiltY;
+            r.tiltZ = this.tiltZ;
             r.color = this.color;
             r.alpha = this.alpha;
             r.width = this.width;
@@ -323,7 +335,9 @@ public class WardSourceBlockEntity extends BlockEntity {
             c.putFloat("radius", r.radius);
             c.putFloat("speed", r.speed);
             c.putFloat("angle", r.angle);
-            c.putFloat("tilt", r.tilt);
+            c.putFloat("tiltX", r.tiltX);
+            c.putFloat("tiltY", r.tiltY);
+            c.putFloat("tiltZ", r.tiltZ);
             c.putInt("color", r.color);
             c.putFloat("alpha", r.alpha);
             c.putFloat("width", r.width);
@@ -367,7 +381,11 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (c.contains("radius")) r.radius = c.getFloat("radius");
                 if (c.contains("speed")) r.speed = c.getFloat("speed");
                 if (c.contains("angle")) r.angle = c.getFloat("angle");
-                if (c.contains("tilt")) r.tilt = c.getFloat("tilt");
+                // 三轴倾斜；旧存档只有单轴 "tilt"，兼容并入 tiltX
+                if (c.contains("tiltX")) r.tiltX = c.getFloat("tiltX");
+                else if (c.contains("tilt")) r.tiltX = c.getFloat("tilt");
+                if (c.contains("tiltY")) r.tiltY = c.getFloat("tiltY");
+                if (c.contains("tiltZ")) r.tiltZ = c.getFloat("tiltZ");
                 if (c.contains("color")) r.color = c.getInt("color");
                 if (c.contains("alpha")) r.alpha = c.getFloat("alpha");
                 if (c.contains("width")) r.width = c.getFloat("width");

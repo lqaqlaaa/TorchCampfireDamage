@@ -121,8 +121,15 @@ public class OrbitRenderHandler {
 
                 pose.pushPose();
                 pose.translate(0.5, cy, 0.5);
-                if (ring.tilt != 0f) {
-                    pose.mulPose(Axis.XP.rotationDegrees(ring.tilt));
+                // 三轴倾斜叠加：X=俯仰(前后)，Y=水平自转，Z=侧倾(左右)
+                if (ring.tiltZ != 0f) {
+                    pose.mulPose(Axis.ZP.rotationDegrees(ring.tiltZ));
+                }
+                if (ring.tiltX != 0f) {
+                    pose.mulPose(Axis.XP.rotationDegrees(ring.tiltX));
+                }
+                if (ring.tiltY != 0f) {
+                    pose.mulPose(Axis.YP.rotationDegrees(ring.tiltY));
                 }
 
                 drawTrail(pose, buffers, ring, curRad, camPos, be);

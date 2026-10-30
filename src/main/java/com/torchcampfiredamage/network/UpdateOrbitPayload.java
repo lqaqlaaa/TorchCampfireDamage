@@ -25,8 +25,9 @@ public record UpdateOrbitPayload(
         RingData[] rings
 ) implements CustomPacketPayload {
 
-    /** 单环数据 */
-    public record RingData(ItemStack item, float radius, float speed, float angle, float tilt,
+    /** 单环数据（tiltX/Y/Z 为三轴倾斜） */
+    public record RingData(ItemStack item, float radius, float speed, float angle,
+                           float tiltX, float tiltY, float tiltZ,
                            int color, float alpha, float width, int style, float spacing) {}
 
     public static final ResourceLocation ID =
@@ -50,13 +51,15 @@ public record UpdateOrbitPayload(
                         float r = buf.readFloat();
                         float s = buf.readFloat();
                         float a = buf.readFloat();
-                        float t = buf.readFloat();
+                        float tx = buf.readFloat();
+                        float ty = buf.readFloat();
+                        float tz = buf.readFloat();
                         int col = buf.readVarInt();
                         float al = buf.readFloat();
                         float wd = buf.readFloat();
                         int sty = buf.readVarInt();
                         float sp = buf.readFloat();
-                        arr[i] = new RingData(st, r, s, a, t, col, al, wd, sty, sp);
+                        arr[i] = new RingData(st, r, s, a, tx, ty, tz, col, al, wd, sty, sp);
                     }
                     return new UpdateOrbitPayload(pos, vis, centerIt, cScale, cSpin, arr);
                 }
@@ -77,7 +80,9 @@ public record UpdateOrbitPayload(
                         buf.writeFloat(rd == null ? 0.8f : rd.radius());
                         buf.writeFloat(rd == null ? 2.0f : rd.speed());
                         buf.writeFloat(rd == null ? 0f : rd.angle());
-                        buf.writeFloat(rd == null ? 0f : rd.tilt());
+                        buf.writeFloat(rd == null ? 0f : rd.tiltX());
+                        buf.writeFloat(rd == null ? 0f : rd.tiltY());
+                        buf.writeFloat(rd == null ? 0f : rd.tiltZ());
                         buf.writeVarInt(rd == null ? 0x66DDFF : rd.color());
                         buf.writeFloat(rd == null ? 0.55f : rd.alpha());
                         buf.writeFloat(rd == null ? 0.03f : rd.width());
@@ -122,7 +127,9 @@ public record UpdateOrbitPayload(
                     ring.radius = rd.radius();
                     ring.speed = rd.speed();
                     ring.angle = rd.angle();
-                    ring.tilt = rd.tilt();
+                    ring.tiltX = rd.tiltX();
+                    ring.tiltY = rd.tiltY();
+                    ring.tiltZ = rd.tiltZ();
                     ring.color = rd.color();
                     ring.alpha = rd.alpha();
                     ring.width = rd.width();
