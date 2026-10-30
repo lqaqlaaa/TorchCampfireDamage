@@ -22,6 +22,8 @@ public class BlockPickerScreen extends Screen {
     private static final int COLS = 9;
     private static final int ROWS = 5;
     private static final int CELL = 20;
+    /** 实际单元格边长（自适应） */
+    private int cell = CELL;
 
     private final Screen parent;
     private final boolean forA;
@@ -42,32 +44,52 @@ public class BlockPickerScreen extends Screen {
     protected void init() {
         rebuildList("");
 
-        int cx = this.width / 2;
-        int cy = this.height / 2;
+int cx = this.width / 2;
 
-        gridX = cx - (COLS * CELL) / 2;
-        gridY = cy - (ROWS * CELL) / 2 - 10;
+        /* ---- 自适应 ---- */
+        int availW = this.width - 16;
+        int availH = this.height - 70;
+
+        cell = Math.min(CELL, Math.max(10, availW / COLS));
+        if (ROWS * cell > availH) {
+            cell = Math.max(8, availH / ROWS);
+        }
+
+        int gw = COLS * cell;
+        int gh = ROWS * cell;
+
+        gridX = cx - gw / 2;
+        gridY = Math.max(46, (this.height - gh) / 2);
 
         // 搜索框
-        searchBox = new EditBox(this.font, cx - 150, gridY - 28, 300, 18,
+        int searchW = Math.max(100, Math.min(300, availW));
+        searchBox = new EditBox(this.font, cx - searchW / 2, gridY - 28, searchW, 16,
                 Component.literal("搜索"));
         searchBox.setHint(Component.literal("输入方块名搜索…"));
         searchBox.setResponder(this::rebuildList);
         addRenderableWidget(searchBox);
 
-        // 翻页
-        addRenderableWidget(Button.builder(Component.literal("▲ 上一页"), b -> {
-            scrollRow = Math.max(0, scrollRow - ROWS);
-        }).bounds(cx - 150, gridY + ROWS * CELL + 6, 70, 18).build());
+        /* ---- 底部按钮：三个横排居中 ---- */
+        int by = gridY + gh + 6;
+        if (by > this.height - 22) by = this.height - 22;
 
-        addRenderableWidget(Button.builder(Component.literal("▼ 下一页"), b -> {
+        int bw = Math.max(40, Math.min(70, (this.width - 26) / 3));
+        int gap = 4;
+        int totalW = bw * 3 + gap * 2;
+        int bx0 = cx - totalW / 2;
+
+        addRenderableWidget(Button.builder(Component.literal("▲"), b -> {
+            scrollRow = Math.max(0, scrollRow - ROWS);
+        }).bounds(bx0, by, bw, 18).build());
+
+        addRenderableWidget(Button.builder(Component.literal("▼"), b -> {
             int maxRow = Math.max(0, (filtered.size() + COLS - 1) / COLS - ROWS);
             scrollRow = Math.min(maxRow, scrollRow + ROWS);
-        }).bounds(cx - 74, gridY + ROWS * CELL + 6, 70, 18).build());
+        }).bounds(bx0 + bw + gap, by, bw, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b ->
                 minecraft.setScreen(parent))
-                .bounds(cx + 4, gridY + ROWS * CELL + 6, 60, 18).build());
+                .bounds(bx0 + (bw + gap) * 2, by, bw, 18).build());
     }
 
     private void rebuildList(String query) {
@@ -100,9 +122,9 @@ public class BlockPickerScreen extends Screen {
                 int idx = (scrollRow + r) * COLS + c;
                 if (idx >= filtered.size()) break;
 
-                int x = gridX + c * CELL;
-                int y = gridY + r * CELL;
-                if (mx >= x && mx < x + CELL && my >= y && my < y + CELL) {
+                int x = gridX + c * cell;
+                int y = gridY + r * cell;
+                if (mx >= x && mx < x + cell && my >= y && my < y + cell) {
                     Block chosen = filtered.get(idx);
                     if (forA) DisplaySettingsScreen.blockA = chosen;
                     else DisplaySettingsScreen.blockB = chosen;
@@ -134,7 +156,7 @@ public class BlockPickerScreen extends Screen {
 
         // 网格背景
         gg.fill(gridX - 2, gridY - 2,
-                gridX + COLS * CELL + 2, gridY + ROWS * CELL + 2, 0xC0000000);
+                gridX + COLS * cell + 2, gridY + ROWS * cell + 2, 0xC0000000);
 
         Block hovered = null;
         int hoverX = 0, hoverY = 0;
@@ -145,27 +167,26 @@ public class BlockPickerScreen extends Screen {
                 if (idx >= filtered.size()) break;
 
                 Block b = filtered.get(idx);
-                int x = gridX + c * CELL;
-                int y = gridY + r * CELL;
+                int x = gridX + c * cell;
+                int y = gridY + r * cell;
 
                 ItemStack stack = new ItemStack(b);
                 gg.renderItem(stack, x + 2, y + 2);
 
                 // 悬停高亮
-                if (mouseX >= x && mouseX < x + CELL && mouseY >= y && mouseY < y + CELL) {
-                    gg.fill(x, y, x + CELL, y + CELL, 0x60FFFFFF);
+                if (mouseX >= x && mouseX < x + cell && mouseY >= y && mouseY < y + cell) {
+                    gg.fill(x, y, x + cell, y + cell, 0x60FFFFFF);
                     hovered = b;
                     hoverX = mouseX;
                     hoverY = mouseY;
                 }
-
                 // 当前已选的标记
                 Block current = forA ? DisplaySettingsScreen.blockA : DisplaySettingsScreen.blockB;
                 if (b == current) {
-                    gg.fill(x, y, x + CELL, y + 1, 0xFF00FF00);
-                    gg.fill(x, y + CELL - 1, x + CELL, y + CELL, 0xFF00FF00);
-                    gg.fill(x, y, x + 1, y + CELL, 0xFF00FF00);
-                    gg.fill(x + CELL - 1, y, x + CELL, y + CELL, 0xFF00FF00);
+                    gg.fill(x, y, x + cell, y + 1, 0xFF00FF00);
+                    gg.fill(x, y + cell - 1, x + cell, y + cell, 0xFF00FF00);
+                    gg.fill(x, y, x + 1, y + cell, 0xFF00FF00);
+                    gg.fill(x + cell - 1, y, x + cell, y + cell, 0xFF00FF00);
                 }
             }
         }
@@ -176,17 +197,13 @@ public class BlockPickerScreen extends Screen {
             gg.renderTooltip(this.font, stack, hoverX, hoverY);
         }
 
-        // 页码
+        // 页码（画在网格上方，避免超出屏幕）
         int totalRows = Math.max(1, (filtered.size() + COLS - 1) / COLS);
         String page = "第 " + (scrollRow / ROWS + 1) + " / "
                 + Math.max(1, (totalRows + ROWS - 1) / ROWS) + " 页  共 "
                 + filtered.size() + " 个方块";
-        gg.drawString(this.font, page, this.width / 2 - 150,
-                gridY + ROWS * CELL + 28, 0xAAAAAA);
-
-        // 底部提示
-        gg.drawCenteredString(this.font, "滚轮翻页，点击选择",
-                this.width / 2, gridY + ROWS * CELL + 40, 0x888888);
+        gg.drawCenteredString(this.font, "§7" + page,
+                this.width / 2, gridY - 14, 0xAAAAAA);
     }
 
     @Override

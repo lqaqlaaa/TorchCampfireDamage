@@ -12,12 +12,10 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 
 /**
- * 显示设置：
- *  - 范围预览方块 A/B + 透明度
- *  - 中心物品（外观）
- *  - 星环开关
+ * 显示设置 —— 与主界面统一风格（不画黑底、标签在左、尺寸自适应）。
  * <p>
- * 星环的详细配置在 {@link RingSettingsScreen}（独立界面）。
+ * 范围预览方块 A/B + 透明度、中心物品、星环开关。
+ * 星环详细配置在 {@link RingSettingsScreen}。
  */
 public class DisplaySettingsScreen extends Screen {
 
@@ -36,7 +34,6 @@ public class DisplaySettingsScreen extends Screen {
     /* ===== 星环总开关 ===== */
     public static boolean orbitVisible = true;
 
-    /** 从方块实体读取 */
     public static void loadFrom(WardSourceBlockEntity be) {
         orbitVisible = be.isOrbitVisible();
         centerItem = be.getCenterItem().copy();
@@ -44,13 +41,11 @@ public class DisplaySettingsScreen extends Screen {
         centerSpin = String.format("%.2f", be.getCenterSpin());
     }
 
+    /* ===== 布局参数（自适应） ===== */
     private int px, py;
-    private static final int ROW_H = 20;
-    private static final int PANEL_W = 340;
+    private int rowH, boxH, boxW, labelW;
 
     private EditBox alphaBox;
-    private EditBox centerScaleBox;
-    private EditBox centerSpinBox;
 
     public DisplaySettingsScreen(Screen parent) {
         super(Component.literal("显示设置"));
@@ -59,67 +54,94 @@ public class DisplaySettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
-        int cy = this.height / 2;
-        px = cx - PANEL_W / 2;
-        py = Math.max(16, cy - 90);
+        labelW = GuiLayout.fit(60, this.width, this.height, 40);
+        boxW = GuiLayout.fit(80, this.width, this.height, 50);
 
-        /* ===== 范围显示 ===== */
+        int availW = this.width - 16;
+        if (labelW + boxW > availW) {
+            boxW = Math.max(44, availW - labelW);
+        }
+
+        int availH = this.height - 70;
+        int rows = 5;
+        rowH = GuiLayout.actualRowH(availH, rows, 22, 14);
+        boxH = Math.min(20, rowH - 2);
+        if (boxH < 10) boxH = 10;
+
+        int blockW = labelW + boxW;
+        px = (this.width - blockW) / 2;
+        py = 26 + Math.max(0, (availH - rows * rowH) / 2);
+
+        buildPage();
+    }
+
+    private void buildPage() {
+        this.clearWidgets();
+
+        int x = px + labelW;
+
+        /* 第 1、2 行：预览方块 A / B */
         addRenderableWidget(Button.builder(blockLabel(blockA), b ->
                 minecraft.setScreen(new BlockPickerScreen(this, true)))
-                .bounds(px + 78, py + 28, 110, ROW_H).build());
+                .bounds(x, py, boxW, boxH).build());
 
         addRenderableWidget(Button.builder(blockLabel(blockB), b ->
                 minecraft.setScreen(new BlockPickerScreen(this, false)))
-                .bounds(px + 196, py + 28, 110, ROW_H).build());
+                .bounds(x, py + rowH, boxW, boxH).build());
 
-        alphaBox = new EditBox(this.font, px + 78, py + 54, 56, ROW_H, Component.literal("透明度"));
+        /* 第 3 行：透明度 */
+        alphaBox = new EditBox(this.font, x, py + rowH * 2, boxW, boxH, Component.literal("透明度"));
         alphaBox.setValue(String.format("%.2f", alpha));
         alphaBox.setTooltip(Tooltip.create(Component.literal("0.05 ~ 1.0")));
+        alphaBox.setResponder(v -> {
+            try { alpha = Float.parseFloat(v.trim()); } catch (Exception ignored) {}
+        });
         addRenderableWidget(alphaBox);
 
-        addRenderableWidget(Button.builder(Component.literal("0.2"), b -> alphaBox.setValue("0.2"))
-                .bounds(px + 138, py + 54, 34, ROW_H).build());
-        addRenderableWidget(Button.builder(Component.literal("0.45"), b -> alphaBox.setValue("0.45"))
-                .bounds(px + 176, py + 54, 40, ROW_H).build());
-
-        /* ===== 中心物品 ===== */
+        /* 第 4 行：中心物品 + 大小 + 转速 */
+        int y4 = py + rowH * 3;
         addRenderableWidget(Button.builder(Component.literal(""), b ->
                 minecraft.setScreen(new ItemPickerScreen(this, 99)))
-                .bounds(px + 78, py + 84, ROW_H, ROW_H)
+                .bounds(x, y4, boxH, boxH)
                 .tooltip(Tooltip.create(Component.literal("点击选择中心物品")))
                 .build());
 
-        centerScaleBox = new EditBox(this.font, px + 106, py + 84, 56, ROW_H, Component.literal("大小"));
-        centerScaleBox.setValue(centerScale);
-        centerScaleBox.setTooltip(Tooltip.create(Component.literal("物品大小（不限制）")));
-        centerScaleBox.setResponder(v -> centerScale = v);
-        addRenderableWidget(centerScaleBox);
+        int restW = Math.max(40, boxW - boxH - 6);
+        int halfW = Math.max(34, restW / 2 - 3);
 
-        centerSpinBox = new EditBox(this.font, px + 168, py + 84, 56, ROW_H, Component.literal("转速"));
-        centerSpinBox.setValue(centerSpin);
-        centerSpinBox.setTooltip(Tooltip.create(Component.literal("度/tick，可正可负")));
-        centerSpinBox.setResponder(v -> centerSpin = v);
-        addRenderableWidget(centerSpinBox);
+        EditBox scaleBox = new EditBox(this.font, x + boxH + 6, y4, halfW, boxH,
+                Component.literal("大小"));
+        scaleBox.setValue(centerScale);
+        scaleBox.setTooltip(Tooltip.create(Component.literal("物品大小")));
+        scaleBox.setResponder(v -> centerScale = v);
+        addRenderableWidget(scaleBox);
 
-        /* ===== 底部 ===== */
+        EditBox spinBox = new EditBox(this.font, x + boxH + 6 + halfW + 6, y4, halfW, boxH,
+                Component.literal("转速"));
+        spinBox.setValue(centerSpin);
+        spinBox.setTooltip(Tooltip.create(Component.literal("度/tick，可正可负")));
+        spinBox.setResponder(v -> centerSpin = v);
+        addRenderableWidget(spinBox);
+
+        /* 第 5 行：星环开关 */
         addRenderableWidget(Button.builder(orbitVisibleText(), b -> {
             orbitVisible = !orbitVisible;
             b.setMessage(orbitVisibleText());
-        }).bounds(px + 30, py + 120, 96, ROW_H).build());
+        }).bounds(x, py + rowH * 4, boxW, boxH).build());
 
-        addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
-            RingSettingsScreen.loadFrom(WardConfigScreen.lastBE);
-            minecraft.setScreen(new RingSettingsScreen(this));
-        }).bounds(px + 132, py + 120, 88, ROW_H)
-                .tooltip(Tooltip.create(Component.literal("配置每一圈圈的物品/半径/速度/角度")))
-                .build());
+        /* 底部按钮 */
+        int cx = this.width / 2;
+        int bw = Math.min(80, (this.width - 40) / 2);
+        int gap = 8;
+        int by = this.height - 30;
 
-        addRenderableWidget(Button.builder(Component.literal("确定"), b -> apply())
-                .bounds(px + 224, py + 120, 60, ROW_H).build());
+        addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
+            apply();
+            minecraft.setScreen(parent);
+        }).bounds(cx - bw - gap / 2, by, bw, 20).build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b ->
-                minecraft.setScreen(parent)).bounds(px + 288, py + 120, 40, ROW_H).build());
+                minecraft.setScreen(parent)).bounds(cx + gap / 2, by, bw, 20).build());
     }
 
     private Component blockLabel(Block b) {
@@ -127,45 +149,47 @@ public class DisplaySettingsScreen extends Screen {
     }
 
     private Component orbitVisibleText() {
-        return Component.literal("星环: " + (orbitVisible ? "开" : "关"));
+        return Component.literal("星环: " + (orbitVisible ? "§a开" : "§c关"));
     }
 
     private void apply() {
-        alpha = parse(alphaBox.getValue(), 0.45f);
+        try {
+            alpha = Math.max(0.05f, Math.min(1.0f, Float.parseFloat(alphaBox.getValue().trim())));
+        } catch (Exception ignored) {
+        }
         RangeOverlay.alpha = alpha;
-        minecraft.setScreen(parent);
     }
 
-    private static float parse(String s, float def) {
-        try {
-            return Float.parseFloat(s.trim());
-        } catch (Exception e) {
-            return def;
-        }
-    }
+    /* ================= 渲染 ================= */
 
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        gg.fill(px, py, px + PANEL_W, py + 150, 0xC0000000);
-        gg.drawCenteredString(this.font, "显示设置", px + PANEL_W / 2, py + 6, 0xFFD700);
+        gg.drawCenteredString(this.font, "显示设置", this.width / 2, 8, 0xFFD700);
 
-        // 范围显示
-        gg.drawString(this.font, "§e范围预览", px + 12, py + 12, 0xFFFFFF);
-        gg.drawString(this.font, "方块", px + 12, py + 34, 0xFFFFFF);
-        gg.drawString(this.font, "透明度", px + 12, py + 60, 0xFFFFFF);
+        int x = px;
+        int tx = px + labelW;
+        int textOff = (boxH - 8) / 2;
 
-        gg.renderItem(new ItemStack(blockA), px + 62, py + 29);
-        gg.renderItem(new ItemStack(blockB), px + 180, py + 29);
+        // 第 1、2 行：方块预览（图标画在标签和按钮之间）
+        gg.drawString(this.font, "方块 A", x, py + textOff, 0xFFFFFF);
+        gg.drawString(this.font, "方块 B", x, py + rowH + textOff, 0xFFFFFF);
 
-        // 中心物品
-        gg.drawString(this.font, "§e中心物品", px + 12, py + 68, 0xFFFFFF);
-        gg.fill(px + 77, py + 83, px + 99, py + 105, 0xFF3A3A3A);
+        // 第 3 行：透明度
+        gg.drawString(this.font, "透明度", x, py + rowH * 2 + textOff, 0xFFFFFF);
+
+        // 第 4 行：中心物品
+        int y4 = py + rowH * 3;
+        gg.drawString(this.font, "中心物品", x, y4 + textOff, 0xFFFFFF);
+        gg.fill(tx - 1, y4 - 1, tx + boxH + 1, y4 + boxH + 1, 0xFF3A3A3A);
         if (!centerItem.isEmpty()) {
-            gg.renderItem(centerItem, px + 80, py + 86);
+            gg.renderItem(centerItem, tx + 2, y4 + 2);
         }
+
+        // 第 5 行：星环
+        gg.drawString(this.font, "星环显示", x, py + rowH * 4 + textOff, 0xFFFFFF);
     }
 
     @Override

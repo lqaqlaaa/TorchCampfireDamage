@@ -23,6 +23,8 @@ public class ItemPickerScreen extends Screen {
     private static final int COLS = 9;
     private static final int ROWS = 5;
     private static final int CELL = 20;
+    /** 实际单元格边长（自适应，可能小于 CELL） */
+    private int cell = CELL;
 
     private final Screen parent;
     /** 要设置的槽位 0~3 */
@@ -45,25 +47,50 @@ public class ItemPickerScreen extends Screen {
         rebuildList("");
 
         int cx = this.width / 2;
-        int cy = this.height / 2;
 
-        gridX = cx - (COLS * CELL) / 2;
-        gridY = cy - (ROWS * CELL) / 2 - 10;
+        /* ---- 自适应：格子尺寸与网格按屏幕压缩 ---- */
+        int availW = this.width - 16;
+        int availH = this.height - 70;
 
-        searchBox = new EditBox(this.font, cx - 150, gridY - 28, 300, 18,
+        cell = Math.min(CELL, Math.max(10, availW / COLS));
+        if (ROWS * cell > availH) {
+            cell = Math.max(8, availH / ROWS);
+        }
+
+        int gw = COLS * cell;
+        int gh = ROWS * cell;
+
+        gridX = cx - gw / 2;
+        gridY = Math.max(46, (this.height - gh) / 2);
+
+        int searchW = Math.max(100, Math.min(300, availW));
+        searchBox = new EditBox(this.font, cx - searchW / 2, gridY - 28, searchW, 16,
                 Component.literal("搜索"));
         searchBox.setHint(Component.literal("输入物品名搜索…"));
         searchBox.setResponder(this::rebuildList);
         addRenderableWidget(searchBox);
 
-        addRenderableWidget(Button.builder(Component.literal("▲ 上一页"), b -> {
-            scrollRow = Math.max(0, scrollRow - ROWS);
-        }).bounds(cx - 150, gridY + ROWS * CELL + 6, 70, 18).build());
+        /* ---- 底部按钮：四个横排，居中，按屏幕宽度压缩 ---- */
+        int by = gridY + gh + 6;
+        if (by > this.height - 22) by = this.height - 22;
 
-        addRenderableWidget(Button.builder(Component.literal("▼ 下一页"), b -> {
+        int bw = Math.max(40, Math.min(70, (this.width - 30) / 4));
+        int gap = 4;
+        int totalW = bw * 4 + gap * 3;
+        int bx0 = cx - totalW / 2;
+
+        addRenderableWidget(Button.builder(Component.literal("▲"), b -> {
+            scrollRow = Math.max(0, scrollRow - ROWS);
+        }).bounds(bx0, by, bw, 18)
+                .tooltip(Tooltip.create(Component.literal("上一页")))
+                .build());
+
+        addRenderableWidget(Button.builder(Component.literal("▼"), b -> {
             int maxRow = Math.max(0, (filtered.size() + COLS - 1) / COLS - ROWS);
             scrollRow = Math.min(maxRow, scrollRow + ROWS);
-        }).bounds(cx - 74, gridY + ROWS * CELL + 6, 70, 18).build());
+        }).bounds(bx0 + bw + gap, by, bw, 18)
+                .tooltip(Tooltip.create(Component.literal("下一页")))
+                .build());
 
         addRenderableWidget(Button.builder(Component.literal("清空"), b -> {
             if (slot == 99) {
@@ -72,11 +99,11 @@ public class ItemPickerScreen extends Screen {
                 RingSettingsScreen.RINGS.get(slot).item = ItemStack.EMPTY;
             }
             minecraft.setScreen(parent);
-        }).bounds(cx + 2, gridY + ROWS * CELL + 6, 50, 18).build());
+        }).bounds(bx0 + (bw + gap) * 2, by, bw, 18).build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b ->
                 minecraft.setScreen(parent))
-                .bounds(cx + 58, gridY + ROWS * CELL + 6, 50, 18).build());
+                .bounds(bx0 + (bw + gap) * 3, by, bw, 18).build());
     }
 
     private void rebuildList(String query) {
@@ -108,9 +135,9 @@ public class ItemPickerScreen extends Screen {
                 int idx = (scrollRow + r) * COLS + c;
                 if (idx >= filtered.size()) break;
 
-                int x = gridX + c * CELL;
-                int y = gridY + r * CELL;
-                if (mx >= x && mx < x + CELL && my >= y && my < y + CELL) {
+                int x = gridX + c * cell;
+                int y = gridY + r * cell;
+                if (mx >= x && mx < x + cell && my >= y && my < y + cell) {
                     Item chosen = filtered.get(idx);
                     if (slot == 99) {
                         DisplaySettingsScreen.centerItem = new ItemStack(chosen);
@@ -145,7 +172,7 @@ public class ItemPickerScreen extends Screen {
                 this.width / 2, gridY - 42, 0xFFD700);
 
         gg.fill(gridX - 2, gridY - 2,
-                gridX + COLS * CELL + 2, gridY + ROWS * CELL + 2, 0xC0000000);
+                gridX + COLS * cell + 2, gridY + ROWS * cell + 2, 0xC0000000);
 
         Item hovered = null;
         int hx = 0, hy = 0;
@@ -156,13 +183,13 @@ public class ItemPickerScreen extends Screen {
                 if (idx >= filtered.size()) break;
 
                 Item it = filtered.get(idx);
-                int x = gridX + c * CELL;
-                int y = gridY + r * CELL;
+                int x = gridX + c * cell;
+                int y = gridY + r * cell;
 
                 gg.renderItem(new ItemStack(it), x + 2, y + 2);
 
-                if (mouseX >= x && mouseX < x + CELL && mouseY >= y && mouseY < y + CELL) {
-                    gg.fill(x, y, x + CELL, y + CELL, 0x60FFFFFF);
+                if (mouseX >= x && mouseX < x + cell && mouseY >= y && mouseY < y + cell) {
+                    gg.fill(x, y, x + cell, y + cell, 0x60FFFFFF);
                     hovered = it;
                     hx = mouseX;
                     hy = mouseY;
@@ -178,10 +205,10 @@ public class ItemPickerScreen extends Screen {
                     cur = ItemStack.EMPTY;
                 }
                 if (!cur.isEmpty() && cur.getItem() == it) {
-                    gg.fill(x, y, x + CELL, y + 1, 0xFF00FF00);
-                    gg.fill(x, y + CELL - 1, x + CELL, y + CELL, 0xFF00FF00);
-                    gg.fill(x, y, x + 1, y + CELL, 0xFF00FF00);
-                    gg.fill(x + CELL - 1, y, x + CELL, y + CELL, 0xFF00FF00);
+                    gg.fill(x, y, x + cell, y + 1, 0xFF00FF00);
+                    gg.fill(x, y + cell - 1, x + cell, y + cell, 0xFF00FF00);
+                    gg.fill(x, y, x + 1, y + cell, 0xFF00FF00);
+                    gg.fill(x + cell - 1, y, x + cell, y + cell, 0xFF00FF00);
                 }
             }
         }
@@ -194,11 +221,10 @@ public class ItemPickerScreen extends Screen {
         String page = "第 " + (scrollRow / ROWS + 1) + " / "
                 + Math.max(1, (totalRows + ROWS - 1) / ROWS) + " 页  共 "
                 + filtered.size() + " 个物品";
-        gg.drawString(this.font, page, this.width / 2 - 150,
-                gridY + ROWS * CELL + 28, 0xAAAAAA);
 
-        gg.drawCenteredString(this.font, "滚轮翻页，点击选择",
-                this.width / 2, gridY + ROWS * CELL + 40, 0x888888);
+        // 页码画在网格正上方、搜索框下方的空白处，避免超出屏幕
+        gg.drawCenteredString(this.font, "§7" + page,
+                this.width / 2, gridY - 14, 0xAAAAAA);
     }
 
     @Override

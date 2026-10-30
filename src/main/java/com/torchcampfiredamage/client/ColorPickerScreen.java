@@ -29,6 +29,8 @@ public class ColorPickerScreen extends Screen {
     private static final int COLS = 12;
     private static final int ROWS = 8;
     private static final int CELL = 18;
+    /** 实际单元格边长（自适应，可能小于 CELL） */
+    private int cell = CELL;
     private int gridX, gridY;
 
     /* 亮度 / 透明度条 */
@@ -60,25 +62,54 @@ public class ColorPickerScreen extends Screen {
     @Override
     protected void init() {
         int cx = this.width / 2;
-        int cy = this.height / 2;
 
-        int gw = COLS * CELL;
-        gridX = cx - gw / 2 - 30;
-        gridY = cy - (ROWS * CELL) / 2 - 20;
+        /* ---- 自适应：网格尺寸按屏幕可用空间压缩 ---- */
+        // 右侧面板最小宽度（滑块 + 输入框 + 按钮）
+        final int sideW = 64;
+        int availW = this.width - 16;
+        int availH = this.height - 20;
 
-        barX = gridX + gw + 24;
-        barW = 90;
-        barH = 14;
-        valueBarY = gridY + 20;
-        alphaBarY = valueBarY + 34;
+        // 网格最多占 availW - sideW - 12
+        int maxGridW = Math.max(60, availW - sideW - 12);
+        int cell = Math.min(CELL, Math.max(8, maxGridW / COLS));
+        int gw = COLS * cell;
+        int gh = ROWS * cell;
 
-        hexBox = new EditBox(this.font, barX, alphaBarY + 26, barW, 18, Component.literal("HEX"));
+        // 高度也要能放下
+        if (gh > availH - 10) {
+            cell = Math.max(6, (availH - 10) / ROWS);
+            gw = COLS * cell;
+            gh = ROWS * cell;
+        }
+        this.cell = cell;
+
+        int totalW = gw + 10 + sideW;
+        int startX = cx - totalW / 2;
+
+        gridX = startX;
+        gridY = Math.max(24, (this.height - gh) / 2);
+
+        barX = gridX + gw + 10;
+        barW = Math.max(50, Math.min(sideW, this.width - barX - 6));
+        barH = 12;
+
+        // 右侧面板纵向依次排布，且不超出屏幕底部
+        int panelTop = gridY;
+        valueBarY = panelTop;
+        alphaBarY = valueBarY + barH + 10;
+
+        int boxW = barW;
+        int boxH = 16;
+
+        hexBox = new EditBox(this.font, barX, alphaBarY + barH + 8, boxW, boxH,
+                Component.literal("HEX"));
         hexBox.setValue(String.format("#%06X", rgb));
         hexBox.setTooltip(Tooltip.create(Component.literal("输入 #RRGGBB")));
         hexBox.setResponder(this::onHexInput);
         addRenderableWidget(hexBox);
 
-        alphaBox = new EditBox(this.font, barX, alphaBarY + 50, barW, 18, Component.literal("ALPHA"));
+        alphaBox = new EditBox(this.font, barX, alphaBarY + barH + 8 + boxH + 6, boxW, boxH,
+                Component.literal("ALPHA"));
         alphaBox.setValue(String.format("%.2f", alpha));
         alphaBox.setTooltip(Tooltip.create(Component.literal("0 ~ 1")));
         alphaBox.setResponder(v -> {
@@ -88,14 +119,18 @@ public class ColorPickerScreen extends Screen {
         });
         addRenderableWidget(alphaBox);
 
-        int by = alphaBarY + 82;
+        // 按钮放底部居中，避免挤在右侧导致超屏
+        int by = this.height - 26;
+        int bw = Math.min(64, (this.width - 40) / 2);
+        int bx = cx - bw - 4;
+
         addRenderableWidget(Button.builder(Component.literal("确定"), b -> {
             callback.onPick(rgb, alpha);
             minecraft.setScreen(parent);
-        }).bounds(barX, by, 43, 20).build());
+        }).bounds(bx, by, bw, 20).build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b ->
-                minecraft.setScreen(parent)).bounds(barX + 47, by, 43, 20).build());
+                minecraft.setScreen(parent)).bounds(bx + bw + 8, by, bw, 20).build());
     }
 
     private static float clampi(float v, float a, float b) {
@@ -119,11 +154,11 @@ public class ColorPickerScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         // 网格
-        int gw = COLS * CELL;
-        int gh = ROWS * CELL;
+        int gw = COLS * cell;
+        int gh = ROWS * cell;
         if (mx >= gridX && mx < gridX + gw && my >= gridY && my < gridY + gh) {
-            int c = (int) ((mx - gridX) / CELL);
-            int r = (int) ((my - gridY) / CELL);
+            int c = (int) ((mx - gridX) / cell);
+            int r = (int) ((my - gridY) / cell);
             c = Math.max(0, Math.min(COLS - 1, c));
             r = Math.max(0, Math.min(ROWS - 1, r));
 
@@ -185,8 +220,8 @@ public class ColorPickerScreen extends Screen {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int gw = COLS * CELL;
-        int gh = ROWS * CELL;
+        int gw = COLS * cell;
+        int gh = ROWS * cell;
 
         // 标题
         gg.drawCenteredString(this.font, "选择颜色", gridX + gw / 2, gridY - 24, 0xFFD700);
@@ -201,22 +236,22 @@ public class ColorPickerScreen extends Screen {
                 float s = (r + 0.5f) / ROWS;
                 int col = 0xFF000000 | hsvToRgb(h, s, val);
 
-                int x = gridX + c * CELL;
-                int y = gridY + r * CELL;
-                gg.fill(x, y, x + CELL - 1, y + CELL - 1, col);
+                int x = gridX + c * cell;
+                int y = gridY + r * cell;
+                gg.fill(x, y, x + cell - 1, y + cell - 1, col);
             }
         }
 
         // 当前选中格的高亮框
         int selC = Math.round(hue * (COLS - 1));
         int selR = Math.max(0, Math.min(ROWS - 1, (int) (sat * ROWS)));
-        int sx = gridX + selC * CELL;
-        int sy = gridY + selR * CELL;
+        int sx = gridX + selC * cell;
+        int sy = gridY + selR * cell;
         // 白色十字框（4 条线）
-        gg.fill(sx - 1, sy - 1, sx + CELL, sy, 0xFFFFFFFF);
-        gg.fill(sx - 1, sy + CELL - 1, sx + CELL, sy + CELL, 0xFFFFFFFF);
-        gg.fill(sx - 1, sy, sx, sy + CELL - 1, 0xFFFFFFFF);
-        gg.fill(sx + CELL - 1, sy, sx + CELL, sy + CELL - 1, 0xFFFFFFFF);
+        gg.fill(sx - 1, sy - 1, sx + cell, sy, 0xFFFFFFFF);
+        gg.fill(sx - 1, sy + cell - 1, sx + cell, sy + cell, 0xFFFFFFFF);
+        gg.fill(sx - 1, sy, sx, sy + cell - 1, 0xFFFFFFFF);
+        gg.fill(sx + cell - 1, sy, sx + cell, sy + cell - 1, 0xFFFFFFFF);
 
         // ===== 亮度条 =====
         gg.drawString(this.font, "亮度", barX, valueBarY - 12, 0xFFFFFF);
