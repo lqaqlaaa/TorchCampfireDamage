@@ -144,8 +144,8 @@ public class ModConfig {
                 .defineInRange("chunkRadius", 1, 0, 32);
 
         OFFHAND_INTERVAL = builder
-                .comment("副手火把的伤害间隔（tick，1 = 每 tick）")
-                .defineInRange("interval", 1, 1, Integer.MAX_VALUE);
+                .comment("副手火把的伤害间隔（tick，1 = 每 tick，建议 5~10 降低卡顿）")
+                .defineInRange("interval", 5, 1, Integer.MAX_VALUE);
 
         OFFHAND_ANNOUNCE = builder.comment("副手火把是否播报").define("announce", false);
         OFFHAND_GLOWING = builder.comment("副手火把是否发光").define("glowing", false);

@@ -1,0 +1,89 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
+}
+
+version = '1.0.0'
+group = 'com.torchcampfiredamage'
+
+base {
+    archivesName = 'torchcampfiredamage-forge'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+
+    copyIdeResources = true
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                torchcampfiredamage {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                torchcampfiredamage {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    // Curios 官方仓库
+    maven {
+        name = 'IllusiveC4'
+        url = 'https://maven.theillusivec4.top/'
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:1.20.1-47.4.28"
+
+    // Curios 1.20.1 —— 饰品栏支持
+    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1:api")
+    runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1")
+    // JEI 不是必需，这里不加
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+
+// 打包信息
+jar {
+    manifest {
+        attributes([
+                "Specification-Title"     : "torchcampfiredamage",
+                "Specification-Vendor"    : "Custom",
+                "Specification-Version"   : "1",
+                "Implementation-Title"    : project.name,
+                "Implementation-Version"  : project.jar.archiveVersion,
+                "Implementation-Vendor"   : "Custom"
+        ])
+    }
+}
+
+// 输出统一名字
+tasks.named('jar', Jar).configure {
+    archiveFileName = "torchcampfiredamage-forge-1.20.1-${version}.jar"
+}

@@ -1,0 +1,176 @@
+package com.torchcampfiredamage.events;
+
+import com.torchcampfiredamage.block.ModBlocks;
+import com.torchcampfiredamage.config.ModConfig;
+import net.minecraft.core.SectionPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.AABB;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import top.theillusivec4.curios.api.CuriosApi;
+
+import java.util.*;
+
+/**
+ * 副手火把 / 饰品栏护符效果（Forge 1.20.1）。
+ * <p>
+ * 玩家副手持守卫火把 / 护符，或把护符装备到 Curios 饰品栏时，
+ * 以其所在区块为中心造成范围伤害。
+ */
+public class OffhandTorchHandler {
+    private static final int CHUNK = SectionPos.SECTION_SIZE;
+
+    private static final Map<UUID, Long> lastTime = new HashMap<>();
+
+    @SubscribeEvent
+    public void onLevelTick(TickEvent.LevelTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!(event.level instanceof ServerLevel level)) return;
+
+        boolean enabled;
+        int interval, chunkRadius;
+        try {
+            enabled = ModConfig.OFFHAND_ENABLED.get();
+            if (!enabled) return;
+            interval = Math.max(1, ModConfig.OFFHAND_INTERVAL.get());
+            chunkRadius = ModConfig.OFFHAND_CHUNK_RADIUS.get();
+        } catch (Throwable t) {
+            return;
+        }
+
+        long now = level.getGameTime();
+
+        for (Player p : level.players()) {
+            if (!(p instanceof ServerPlayer sp)) continue;
+
+            ItemStack off = sp.getItemInHand(InteractionHand.OFF_HAND);
+            // 生效条件（任一满足）：
+            //   1) 副手持守卫护符
+            //   2) 副手持守卫火把
+            //   3) Curios 饰品栏里装备了守卫护符
+            boolean isCharm = !off.isEmpty() && off.is(ModBlocks.WARD_CHARM_ITEM.get());
+            boolean isTorch = !off.isEmpty() && off.is(ModBlocks.WARD_TORCH_ITEM.get());
+            boolean hasCurioCharm = hasCharmEquipped(sp);
+            if (!isCharm && !isTorch && !hasCurioCharm) {
+                lastTime.remove(sp.getUUID());
+                continue;
+            }
+
+            long last = lastTime.getOrDefault(sp.getUUID(), Long.MIN_VALUE / 2);
+            if (now - last < interval) continue;
+            lastTime.put(sp.getUUID(), now);
+
+            float dmg = getAttackDamage(sp);
+
+            int cx = SectionPos.blockToSectionCoord(sp.getBlockX());
+            int cz = SectionPos.blockToSectionCoord(sp.getBlockZ());
+            AABB area = new AABB(
+                    (double) (cx - chunkRadius) * CHUNK,
+                    sp.getY() - 32,
+                    (double) (cz - chunkRadius) * CHUNK,
+                    (double) (cx + chunkRadius + 1) * CHUNK,
+                    sp.getY() + 32,
+                    (double) (cz + chunkRadius + 1) * CHUNK);
+
+            boolean announce, glowing, slow, tpDrops, tpXp;
+            boolean ignoreNamed;
+            try {
+                announce = ModConfig.OFFHAND_ANNOUNCE.get();
+                glowing = ModConfig.OFFHAND_GLOWING.get();
+                slow = ModConfig.OFFHAND_SLOW.get();
+                tpDrops = ModConfig.OFFHAND_TELEPORT_DROPS.get();
+                tpXp = ModConfig.OFFHAND_TELEPORT_XP.get();
+                ignoreNamed = ModConfig.IGNORE_NAMED_MOBS.get();
+            } catch (Throwable t) {
+                announce = false; glowing = false; slow = false;
+                tpDrops = false; tpXp = false; ignoreNamed = true;
+            }
+
+            Set<UUID> done = new HashSet<>();
+
+            for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
+                if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
+                // 与方块火把一致：跳过被命名的生物（白名单保护）
+                if (ignoreNamed && mob.hasCustomName()) continue;
+                if (!isHostile(mob)) continue;
+
+                if (glowing) mob.setGlowingTag(true);
+                if (slow) {
+                    mob.addEffect(new MobEffectInstance(
+                            MobEffects.MOVEMENT_SLOWDOWN, 100, 254, false, false, true));
+                }
+
+                if (tpDrops || tpXp) {
+                    DamageEventHandler.putDropTarget(mob.getUUID(), sp.blockPosition(), tpDrops, tpXp);
+                }
+
+                DamageSource src = level.damageSources().playerAttack(sp);
+                boolean ok = mob.hurt(src, dmg);
+                if (!ok) {
+                    mob.invulnerableTime = 0;
+                    mob.setHealth(Math.max(0f, mob.getHealth() - dmg));
+                    if (mob.getHealth() <= 0f) mob.die(src);
+                }
+                done.add(mob.getUUID());
+
+                if (!mob.isAlive() && announce) {
+                    sp.sendSystemMessage(Component.literal(
+                            "§6[副手火把] §e" + mob.getName().getString() + "§7 被烧死了"));
+                }
+            }
+        }
+    }
+
+    /**
+     * 检查玩家的 Curios 饰品栏里是否装备了守卫护符。
+     */
+    private static boolean hasCharmEquipped(ServerPlayer player) {
+        try {
+            return CuriosApi.getCuriosInventory(player)
+                    .map(handler -> handler.findFirstCurio(ModBlocks.WARD_CHARM_ITEM.get()).isPresent())
+                    .orElse(false);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** 取玩家当前攻击力（含武器/附魔/修饰符） */
+    private static float getAttackDamage(ServerPlayer player) {
+        try {
+            var attr = player.getAttribute(Attributes.ATTACK_DAMAGE);
+            if (attr != null) {
+                float v = (float) attr.getValue();
+                return v > 0 ? v : 1.0f;
+            }
+        } catch (Throwable ignored) {
+        }
+        return 1.0f;
+    }
+
+    private static boolean isHostile(Mob mob) {
+        if (mob instanceof Enemy) return true;
+        try {
+            if (!ModConfig.TREAT_PROVOKED_AS_HOSTILE.get()) return false;
+        } catch (Throwable t) {
+            return false;
+        }
+        LivingEntity target = mob.getTarget();
+        if (target == null) return false;
+        if (target instanceof Player) return true;
+        return target instanceof TamableAnimal tameable && tameable.getOwner() != null;
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "torch",
+  "pattern": [
+    "X",
+    "#"
+  ],
+  "key": {
+    "X": [
+      { "item": "minecraft:coal" },
+      { "item": "minecraft:charcoal" }
+    ],
+    "#": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "id": "torchcampfiredamage:ward_torch",
+    "count": 4
+  }
+}

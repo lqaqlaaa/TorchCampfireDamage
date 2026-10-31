@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="torchcampfiredamage"
+version="1.0.0"
+displayName="Torch Campfire Damage"
+description='''守卫火把：范围内的敌对生物会被持续伤害，支持掉落物/经验传送、击杀播报、星环外观与 Curios 饰品栏。'''
+authors="Custom"
+credits=""
+
+[[dependencies.torchcampfiredamage]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.torchcampfiredamage]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.21)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.torchcampfiredamage]]
+    modId="curios"
+    mandatory=true
+    versionRange="[5.0,)"
+    ordering="AFTER"
+    side="BOTH"
