@@ -137,10 +137,10 @@ int cx = this.width / 2;
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double dx, double dy) {
+    public boolean mouseScrolled(double mx, double my, double delta) {
         int maxRow = Math.max(0, (filtered.size() + COLS - 1) / COLS - ROWS);
-        if (dy > 0) scrollRow = Math.max(0, scrollRow - 1);
-        else if (dy < 0) scrollRow = Math.min(maxRow, scrollRow + 1);
+        if (delta > 0) scrollRow = Math.max(0, scrollRow - 1);
+        else if (delta < 0) scrollRow = Math.min(maxRow, scrollRow + 1);
         return true;
     }
 

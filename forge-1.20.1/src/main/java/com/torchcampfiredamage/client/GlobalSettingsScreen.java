@@ -411,12 +411,12 @@ public class GlobalSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double dx, double dy) {
-        if (dy > 0 && page > 0) {
+    public boolean mouseScrolled(double mx, double my, double delta) {
+        if (delta > 0 && page > 0) {
             page--;
             buildPage();
             return true;
-        } else if (dy < 0 && page + 1 < pageCount) {
+        } else if (delta < 0 && page + 1 < pageCount) {
             page++;
             buildPage();
             return true;

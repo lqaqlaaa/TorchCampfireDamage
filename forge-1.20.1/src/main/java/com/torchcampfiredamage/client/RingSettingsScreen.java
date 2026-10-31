@@ -415,9 +415,9 @@ public class RingSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double dx, double dy) {
-        if (dy > 0 && page > 0) { page--; buildPage(); return true; }
-        if (dy < 0 && page + 1 < RINGS.size()) { page++; buildPage(); return true; }
+    public boolean mouseScrolled(double mx, double my, double delta) {
+        if (delta > 0 && page > 0) { page--; buildPage(); return true; }
+        if (delta < 0 && page + 1 < RINGS.size()) { page++; buildPage(); return true; }
         return true;
     }
 
