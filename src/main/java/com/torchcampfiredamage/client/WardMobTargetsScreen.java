@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -35,6 +36,7 @@ public class WardMobTargetsScreen extends Screen {
     private EditBox search;
     private int scroll;
     private final List<Button> rowButtons = new ArrayList<>();
+    private final Map<ResourceLocation, Mob> previews = new HashMap<>();
 
     private record MobEntry(ResourceLocation id, String name, boolean enabled, boolean configured) {}
 
@@ -91,6 +93,11 @@ public class WardMobTargetsScreen extends Screen {
                 result.add(new MobEntry(id, name, enabled, configured));
             }
         }
+        result.sort(Comparator
+                .comparingInt((MobEntry e) -> e.id().getNamespace().equals("minecraft") ? 0 : 1)
+                .thenComparing(e -> e.id().getNamespace().toLowerCase(Locale.ROOT))
+                .thenComparing(e -> e.name().toLowerCase(Locale.ROOT))
+                .thenComparing(e -> e.id().toString()));
         return result;
     }
 
@@ -131,10 +138,10 @@ public class WardMobTargetsScreen extends Screen {
         int panelWidth = Math.min(390, this.width - 20);
         int left = (this.width - panelWidth) / 2;
         int top = 58;
-        int rowHeight = 25;
+        int rowHeight = 34;
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
-            int y = top + row * rowHeight;
+            int y = top + row * rowHeight + 10;
             int toggleX = left + panelWidth - 108;
             int resetX = left + panelWidth - 52;
             rowButtons.add(addRenderableWidget(Button.builder(
@@ -196,12 +203,38 @@ public class WardMobTargetsScreen extends Screen {
         }
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
-            int y = 58 + row * 25;
+            int y = 58 + row * 34 + 10;
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
             String label = font.plainSubstrByWidth(entry.name() + " · " + state, panelWidth - 122);
-            gg.drawString(font, label, left + 4, y + 6, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
-            gg.drawString(font, entry.id().toString(), left + 4, y + 15, 0x888888);
+            String namespace = entry.id().getNamespace();
+            if (row == 0 || !namespace.equals(entries.get(row + scroll - 1).id().getNamespace())) {
+                String group = namespace.equals("minecraft") ? "Minecraft 原版" : namespace;
+                gg.fill(left, y - 10, left + panelWidth, y - 9, 0xFF777777);
+                gg.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
+            }
+            renderPreview(gg, entry.id(), left + 18, y + 12);
+            gg.drawString(font, label, left + 38, y + 4, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
+            gg.drawString(font, entry.id().toString(), left + 38, y + 13, 0x888888);
+        }
+    }
+
+
+    private void renderPreview(GuiGraphics graphics, ResourceLocation id, int x, int y) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        Mob preview = previews.computeIfAbsent(id, key -> {
+            try {
+                return BuiltInRegistries.ENTITY_TYPE.getOptional(key)
+                        .map(type -> (Mob) type.create(mc.level)).orElse(null);
+            } catch (Throwable ignored) { return null; }
+        });
+        if (preview != null) {
+            try {
+                preview.setNoAi(true);
+                InventoryScreen.renderEntityInInventoryFollowsAngle(
+                        graphics, x - 10, y - 22, x + 10, y + 2, 18, 0.0F, 0.0F, 0.0F, preview);
+            } catch (Throwable ignored) { }
         }
     }
 
