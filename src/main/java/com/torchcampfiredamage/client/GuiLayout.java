@@ -28,12 +28,28 @@ public final class GuiLayout {
 
     private GuiLayout() {}
 
+    /**
+     * Shared dark navy / electric-blue visual system used by every screen.
+     * Keep this renderer deliberately independent from screen-specific content.
+     */
     public static void drawFrame(GuiGraphics gg, int width, int height) {
-        gg.fill(5, 5, width - 5, height - 5, 0xD8101010);
-        gg.fill(7, 7, width - 7, 31, 0xFF292929);
-        gg.fill(8, 33, width - 8, height - 8, 0xE8202020);
-        gg.renderOutline(5, 5, width - 10, height - 10, 0xFF777777);
-        gg.renderOutline(8, 33, width - 16, height - 41, 0xFF555555);
+        // Outer canvas and inset workspace.
+        gg.fill(0, 0, width, height, 0xC9080D17);
+        gg.fill(5, 5, width - 5, height - 5, 0xF20B111D);
+        gg.fill(7, 7, width - 7, 34, 0xFF101B2C);
+        gg.fill(8, 36, width - 8, height - 8, 0xE6101724);
+
+        // Brand accent and subtle separators.
+        gg.fill(7, 7, 10, height - 7, 0xFF398BFF);
+        gg.fill(10, 34, width - 7, 36, 0xFF263B59);
+        gg.fill(10, 7, width - 7, 8, 0xFF263B59);
+
+        // Layered outlines: cool blue edge, then a quiet inner divider.
+        gg.renderOutline(5, 5, width - 10, height - 10, 0xFF344C6D);
+        gg.renderOutline(8, 36, width - 16, height - 44, 0xFF24354D);
+        if (width > 260 && height > 120) {
+            gg.fill(15, 43, 16, height - 15, 0x553F82D8);
+        }
     }
 
     /**
