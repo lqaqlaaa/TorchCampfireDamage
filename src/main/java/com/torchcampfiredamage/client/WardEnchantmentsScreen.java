@@ -28,8 +28,12 @@ import java.util.TreeMap;
 
 /** 当前单根放置火把的附魔管理界面；候选附魔只从玩家手持的附魔书读取。 */
 public final class WardEnchantmentsScreen extends Screen {
-    private static final int ROWS = 6;
-    private static final int ROW_HEIGHT = 36;
+    private int rowsPerPage = 1;
+    private int rowHeight = 30;
+    private int listTop = 82;
+    private int panelWidth;
+    private int panelLeft;
+    private int footerY;
     private final Screen parent;
     private final ResourceLocation ignored;
     private final net.minecraft.core.BlockPos pos;
@@ -73,21 +77,34 @@ public final class WardEnchantmentsScreen extends Screen {
 
     @Override
     protected void init() {
-        int panelWidth = Math.min(500, width - 16);
-        int left = (width - panelWidth) / 2;
-        search = new EditBox(font, left, 30, panelWidth - 112, 20, Component.literal("搜索已导入附魔"));
+        panelWidth = Math.max(80, Math.min(500, width - 16));
+        panelLeft = (width - panelWidth) / 2;
+        footerY = height - 24;
+        listTop = 82;
+        int availableHeight = Math.max(28, footerY - listTop - 8);
+        rowsPerPage = Math.max(1, Math.min(6, availableHeight / 32));
+        rowHeight = Math.max(28, Math.min(36, availableHeight / rowsPerPage));
+
+        search = new EditBox(font, panelLeft, 30, Math.max(40, panelWidth - 112), 20, Component.literal("搜索已导入附魔"));
         search.setHint(Component.literal("搜索附魔名称"));
         search.setResponder(value -> { page = 0; rebuildRows(); });
         addRenderableWidget(search);
         addRenderableWidget(Button.builder(Component.literal("读取手持附魔书"), b -> importHeldBooks())
-                .bounds(left + panelWidth - 106, 30, 106, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("上一页"), b -> { if (page > 0) { page--; rebuildRows(); } })
-                .bounds(width / 2 - 106, height - 30, 64, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("下一页"), b -> {
-            if ((page + 1) * ROWS < filtered().size()) { page++; rebuildRows(); }
-        }).bounds(width / 2 - 36, height - 30, 64, 20).build());
+                .bounds(panelLeft + panelWidth - 106, 30, 106, 20).build());
+        int buttonW = Math.max(34, Math.min(64, (panelWidth - 12) / 4));
+        int gap = 4;
+        int total = buttonW * 4 + gap * 3;
+        int startX = panelLeft + (panelWidth - total) / 2;
+        addRenderableWidget(Button.builder(Component.literal("‹"), b -> { if (page > 0) { page--; rebuildRows(); } })
+                .bounds(startX, footerY, buttonW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
-                .bounds(width / 2 + 34, height - 30, 64, 20).build());
+                .bounds(startX + buttonW + gap, footerY, buttonW, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("›"), b -> {
+            if ((page + 1) * rowsPerPage < filtered().size()) { page++; rebuildRows(); }
+        }).bounds(startX + (buttonW + gap) * 2, footerY, buttonW, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("清空搜索"), b -> {
+            search.setValue(""); page = 0; rebuildRows();
+        }).bounds(startX + (buttonW + gap) * 3, footerY, buttonW, 20).build());
         rebuildRows();
     }
 
@@ -123,24 +140,24 @@ public final class WardEnchantmentsScreen extends Screen {
         rowWidgets.clear();
         rowLevels.clear();
         List<ResourceLocation> ids = filtered();
-        int panelWidth = Math.min(500, width - 16);
-        int left = (width - panelWidth) / 2;
-        int top = 78;
-        for (int row = 0; row < ROWS && page * ROWS + row < ids.size(); row++) {
-            ResourceLocation id = ids.get(page * ROWS + row);
-            int y = top + row * ROW_HEIGHT;
-            boolean imported = candidates.containsKey(id);
-            int initialLevel = configured.getOrDefault(id, candidates.getOrDefault(id, 1));
-            EditBox level = new EditBox(font, left + panelWidth - 184, y + 5, 48, 20, Component.literal("等级"));
-            level.setValue(Integer.toString(initialLevel));
+        int maxPage = Math.max(0, (ids.size() - 1) / Math.max(1, rowsPerPage));
+        page = Math.max(0, Math.min(page, maxPage));
+        int start = page * rowsPerPage;
+        for (int row = 0; row < rowsPerPage && start + row < ids.size(); row++) {
+            ResourceLocation id = ids.get(start + row);
+            int y = listTop + row * rowHeight;
+            int controlY = y + Math.max(2, (rowHeight - 20) / 2);
+            int levelX = panelLeft + panelWidth - 184;
+            EditBox level = new EditBox(font, levelX, controlY, 48, 20, Component.literal("等级"));
+            level.setValue(Integer.toString(configured.getOrDefault(id, candidates.getOrDefault(id, 1))));
             level.setFilter(value -> value.isEmpty() || value.matches("[0-9]{1,10}"));
             rowLevels.put(id, level);
             rowWidgets.add(addRenderableWidget(level));
             rowWidgets.add(addRenderableWidget(Button.builder(Component.literal("添加/更新"), b -> set(id))
-                    .bounds(left + panelWidth - 130, y + 5, 72, 20).build()));
+                    .bounds(panelLeft + panelWidth - 130, controlY, 72, 20).build()));
             if (configured.containsKey(id)) {
                 rowWidgets.add(addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(id))
-                        .bounds(left + panelWidth - 52, y + 5, 48, 20).build()));
+                        .bounds(panelLeft + panelWidth - 52, controlY, 48, 20).build()));
             }
         }
     }
@@ -173,27 +190,29 @@ public final class WardEnchantmentsScreen extends Screen {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         GuiLayout.drawFrame(graphics, width, height);
         super.render(graphics, mouseX, mouseY, partialTick);
-        int panelWidth = Math.min(500, width - 16);
-        int left = (width - panelWidth) / 2;
-        graphics.drawCenteredString(font, "放置火把 · 从附魔书导入独立攻击附魔", width / 2, 10, 0xFFD700);
-        graphics.drawString(font, "可读取主手/副手附魔书；一本书含多个附魔时会全部导入。读取和添加均不会消耗书。", left, 53, 0xCCCCCC);
-        graphics.drawString(font, status, left, 65, 0x88CCFF);
+        graphics.drawString(font, "守卫火把", 14, 10, 0xFF70AEFF, false);
+        graphics.drawCenteredString(font, "放置火把 · 攻击附魔", width / 2, 10, GuiLayout.TEXT);
+        graphics.drawString(font, "可读取主手/副手附魔书；读取和添加均不会消耗书。", panelLeft, 54, 0xCCCCCC);
+        graphics.drawString(font, status, panelLeft, 66, 0x88CCFF);
         List<ResourceLocation> ids = filtered();
+        int pageCount = Math.max(1, (ids.size() + rowsPerPage - 1) / rowsPerPage);
         graphics.drawString(font, "候选 " + candidates.size() + " 种 · 当前火把已配置 " + configured.size()
-                + " 种 · 第 " + (page + 1) + " / " + Math.max(1, (ids.size() + ROWS - 1) / ROWS) + " 页",
-                left, 42, 0xFFFFFF);
-        for (int row = 0; row < ROWS && page * ROWS + row < ids.size(); row++) {
-            ResourceLocation id = ids.get(page * ROWS + row);
-            int y = 78 + row * ROW_HEIGHT;
+                + " 种 · 第 " + (page + 1) + " / " + pageCount + " 页",
+                panelLeft, 42, 0xFFFFFF);
+        for (int row = 0; row < rowsPerPage && page * rowsPerPage + row < ids.size(); row++) {
+            ResourceLocation id = ids.get(page * rowsPerPage + row);
+            int y = listTop + row * rowHeight;
+            graphics.fill(panelLeft, y, panelLeft + panelWidth, y + rowHeight - 2,
+                    (row & 1) == 0 ? 0x99304765 : 0x88304765);
+            graphics.fill(panelLeft, y, panelLeft + 2, y + rowHeight - 2, GuiLayout.ACCENT);
             Integer bookLevel = candidates.get(id);
             Integer current = configured.get(id);
-            graphics.fill(left, y, left + panelWidth, y + 31, (row & 1) == 0 ? 0x55333333 : 0x44222222);
-            graphics.drawString(font, font.plainSubstrByWidth(displayName(id), panelWidth - 195),
-                    left + 5, y + 4, current == null ? 0xFFFFFF : 0x55FF77);
+            graphics.drawString(font, font.plainSubstrByWidth(displayName(id), Math.max(30, panelWidth - 195)),
+                    panelLeft + 5, y + 3, current == null ? 0xFFFFFF : 0x55FF77);
             String detail = bookLevel == null ? "已配置 · 当前等级 " + current
                     : "附魔书等级 " + bookLevel + (current == null ? " · 尚未添加" : " · 当前火把等级 " + current);
-            graphics.drawString(font, font.plainSubstrByWidth(detail, panelWidth - 195),
-                    left + 5, y + 17, 0xAAAAAA);
+            graphics.drawString(font, font.plainSubstrByWidth(detail, Math.max(30, panelWidth - 195)),
+                    panelLeft + 5, y + 16, 0xFFCCCCCC);
         }
     }
 
