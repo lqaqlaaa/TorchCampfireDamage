@@ -9,8 +9,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.SpawnEggItem;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -132,17 +130,10 @@ public final class MobTargetsScreen extends Screen {
             ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
             EntityType<?> type = id == null ? null : BuiltInRegistries.ENTITY_TYPE.getOptional(id).orElse(null);
             String displayName = type == null ? entry.entityId() + "（未安装）" : type.getDescription().getString();
-            if (type == null) {
-                graphics.drawString(font, "?", left + 8, y + 8, 0xFF7777);
-            } else {
-                SpawnEggItem egg = SpawnEggItem.byId(type);
-                if (egg != null) graphics.renderItem(new ItemStack(egg), left + 6, y + 4);
-                else graphics.drawString(font, "◆", left + 8, y + 8, 0xFFFFFF);
-            }
-            int nameMax = Math.max(20, listWidth - 170);
-            graphics.drawString(font, font.plainSubstrByWidth(displayName, nameMax), left + 30, y + 8,
+            int nameMax = Math.max(20, listWidth - 150);
+            graphics.drawString(font, font.plainSubstrByWidth(displayName, nameMax), left + 8, y + 5,
                     type == null ? 0xFF7777 : 0xFFFFFF);
-            graphics.drawString(font, entry.entityId(), left + 30, y + 17, 0x888888);
+            graphics.drawString(font, entry.entityId(), left + 8, y + 15, 0x888888);
         }
     }
 
