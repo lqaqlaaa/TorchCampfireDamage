@@ -11,7 +11,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import foundry.imgui.neoforge.api.event.RenderImGuiEventsNeoforge;
+import foundry.imgui.api.ImGuiMCEvents;
 
 /**
  * 客户端：右键守卫火把直接打开设置界面（不需要潜行）。
@@ -28,19 +28,22 @@ public class ClientEvents {
 
     static {
         ClientDebugLog.info("ClientEvents class initialized; client event subscriber loaded.");
-    }
-
-    @SubscribeEvent
-    public static void onImGuiRender(RenderImGuiEventsNeoforge.Post event) {
-        imguiPostEvents++;
-        if (imguiPostEvents == 1 || imguiPostEvents % 120 == 0) {
-            ClientDebugLog.info("ImGuiMC Post event received; count=" + imguiPostEvents
-                    + ", screen=" + screenName(Minecraft.getInstance().screen));
-        }
         try {
-            ImGuiSettingsScreen.renderActiveImGui();
+            ImGuiMCEvents.INSTANCE.postRenderImGuiEvent(() -> {
+                imguiPostEvents++;
+                if (imguiPostEvents == 1 || imguiPostEvents % 120 == 0) {
+                    ClientDebugLog.info("ImGuiMC API post-render callback received; count=" + imguiPostEvents
+                            + ", screen=" + screenName(Minecraft.getInstance().screen));
+                }
+                try {
+                    ImGuiSettingsScreen.renderActiveImGui();
+                } catch (Throwable throwable) {
+                    ClientDebugLog.error("Exception while drawing settings UI from ImGuiMC callback.", throwable);
+                }
+            });
+            ClientDebugLog.info("Registered ImGuiMC post-render callback through ImGuiMCEvents API.");
         } catch (Throwable throwable) {
-            ClientDebugLog.error("Exception while dispatching ImGui screen drawing.", throwable);
+            ClientDebugLog.error("Failed to register ImGuiMC post-render callback through its API.", throwable);
         }
     }
 
