@@ -181,7 +181,7 @@ public class DamageEventHandler {
         Map<BlockPos, UUID> owners = positionOwners.computeIfAbsent(level, k -> new HashMap<>());
 
         Set<UUID> damagedThisTick = new HashSet<>();
-        // LinkedHashSet 保留服务端登记顺序；较早登记的火把在重叠区域拥有优先权。
+        // 先复制登记集合，再按持久化放置序号建立优先级区域表。
         List<BlockPos> snapshot = new ArrayList<>(torches);
         List<WardRegion> orderedRegions = new ArrayList<>(snapshot.size());
         Map<BlockPos, WardSourceBlockEntity> activeWards = new HashMap<>();
