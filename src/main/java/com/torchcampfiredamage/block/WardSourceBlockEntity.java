@@ -363,8 +363,8 @@ public class WardSourceBlockEntity extends BlockEntity {
         } else {
             this.blockRadius = Math.max(0, Math.min(512, range));
         }
-        this.damage = Math.max(0, damage);
-        this.interval = Math.max(1, interval);
+        this.damage = Double.isFinite(damage) ? Math.max(0.0, Math.min(2048.0, damage)) : 2.0;
+        this.interval = Math.max(1, Math.min(12000, interval));
         this.glowing = glowing;
         this.slow = slow;
         this.announce = announce;
