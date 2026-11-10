@@ -39,7 +39,7 @@ public record WardDamageTypesPayload(BlockPos pos, int action, String damageType
             BlockEntity raw = level.getBlockEntity(pos);
             if (!(raw instanceof WardSourceBlockEntity ward)) return;
             if (payload.action() != 2 || payload.damageTypeId().length() > 32) return;
-            ward.setSpecialDamageType(payload.enchantmentId(), payload.level() > 0);
+            ward.setSpecialDamageType(payload.damageTypeId(), payload.level() > 0);
         });
     }
 }
