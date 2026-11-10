@@ -366,14 +366,14 @@ public class WardConfigScreen extends Screen {
         for (int i = 0; i < leftLabels.length; i++) {
             int y = rowsTop + i * rowH;
             int x = leftColumnX;
-            gg.fill(x + 2, y - 3, x + colW - 2, y + controlH + 4, 0x99304765);
+            gg.fill(x + 2, y - 3, x + colW - 2, y + controlH + 4, 0x66304765);
             gg.fill(x + 2, y - 3, x + 4, y + controlH + 4, GuiLayout.ACCENT);
             gg.drawString(font, leftLabels[i], x + 8, y + Math.max(2, (controlH - 8) / 2), GuiLayout.TEXT, false);
         }
         int rightX = columns == 2 ? rightColumnX : contentX;
         for (int i = 0; i < rightLabels.length; i++) {
             int y = rowsTop + i * rowH;
-            gg.fill(rightX + 2, y - 3, rightX + colW - 2, y + controlH + 4, 0x99304765);
+            gg.fill(rightX + 2, y - 3, rightX + colW - 2, y + controlH + 4, 0x66304765);
             gg.fill(rightX + 2, y - 3, rightX + 4, y + controlH + 4, GuiLayout.ACCENT);
             gg.drawString(font, rightLabels[i], rightX + 8, y + Math.max(2, (controlH - 8) / 2), GuiLayout.TEXT, false);
         }
