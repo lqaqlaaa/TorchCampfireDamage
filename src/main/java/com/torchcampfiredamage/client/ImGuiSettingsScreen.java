@@ -8,16 +8,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import foundry.imgui.neoforge.api.event.RenderImGuiEventsNeoforge;
 
 /**
  * Guard Torch settings UI. ImGuiMC owns the ImGui context, frame lifecycle,
  * Minecraft input integration and OpenGL renderer; this class only draws UI.
  */
-@EventBusSubscriber(modid = "torchcampfiredamage", value = Dist.CLIENT)
 public final class ImGuiSettingsScreen extends Screen {
     private static final ImBoolean DEMO_TOGGLE = new ImBoolean(true);
     private static final float[] DEMO_SLIDER = {6.0f};
@@ -41,8 +36,7 @@ public final class ImGuiSettingsScreen extends Screen {
         // ImGuiMC renders this screen from its post-frame event.
     }
 
-    @SubscribeEvent
-    public static void onImGuiRender(RenderImGuiEventsNeoforge.Post event) {
+    public static void renderActiveImGui() {
         ImGuiSettingsScreen screen = activeScreen;
         if (screen == null || Minecraft.getInstance().screen != screen) {
             return;
