@@ -202,7 +202,7 @@ public class WardMobTargetsScreen extends Screen {
             gg.drawCenteredString(font, "攻击范围内暂时没有生物，点击刷新重新扫描。",
                     width / 2, height / 2, 0xBBBBBB);
         }
-        for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
+        for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             int y = 58 + row * 44;
             String state = entry.enabled() ? "开启" : "关闭";
