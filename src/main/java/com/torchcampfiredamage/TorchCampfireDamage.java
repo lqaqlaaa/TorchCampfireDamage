@@ -65,11 +65,13 @@ public class TorchCampfireDamage {
                 PlayerMobTargetsRequestPayload.TYPE,
                 PlayerMobTargetsRequestPayload.CODEC,
                 PlayerMobTargetsRequestPayload::handle);
-        // Register the clientbound direction on dedicated servers as well.
-        registrar.playToClient(
-                com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.TYPE,
-                com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.CODEC,
-                (payload, context) -> {});
+        // Dedicated servers also need to know the clientbound payload type.
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.DEDICATED_SERVER) {
+            registrar.playToClient(
+                    com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.TYPE,
+                    com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.CODEC,
+                    (payload, context) -> {});
+        }
         LOGGER.info("[TorchCampfireDamage] Payloads registered.");
     }
 
