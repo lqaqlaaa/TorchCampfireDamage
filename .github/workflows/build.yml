@@ -2,7 +2,7 @@ name: Build Mod
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/player-mob-targets-enchantments' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
