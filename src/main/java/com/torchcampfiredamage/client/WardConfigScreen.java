@@ -161,7 +161,7 @@ public class WardConfigScreen extends Screen {
             }).bounds(x, y, controlW, controlH).build());
             case 1 -> addRenderableWidget(Button.builder(rangeTypeText(), b -> {
                 chunkMode = !chunkMode; b.setMessage(rangeTypeText());
-                rangeText = String.valueOf(convertRange()); rangeBox.setValue(rangeText);
+                rangeText = String.valueOf(convertRange()); if (rangeBox != null) rangeBox.setValue(rangeText);
             }).bounds(x, y, controlW, controlH).build());
             case 2 -> {
                 rangeBox = new EditBox(font, x, y, controlW, controlH, Component.literal("伤害范围"));
@@ -242,7 +242,7 @@ public class WardConfigScreen extends Screen {
             return;
         }
 
-        int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
+        int range = parseInt(rangeText, chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
         RangeOverlay.alpha = DisplaySettingsScreen.alpha;
         RangeOverlay.RangeBox box = RangeOverlay.makeBox(
@@ -301,8 +301,8 @@ public class WardConfigScreen extends Screen {
     private void saveInternal() {
         int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
-        double damage = parseDouble(damageBox.getValue(), 2.0);
-        int interval = parseInt(intervalBox.getValue(), 20, 1, Integer.MAX_VALUE);
+        double damage = parseDouble(damageText, 2.0);
+        int interval = parseInt(intervalText, 20, 1, Integer.MAX_VALUE);
 
         PacketDistributor.sendToServer(new UpdateWardPayload(
                 pos, enabled, chunkMode, range, damage, interval,
