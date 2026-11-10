@@ -27,6 +27,7 @@ public final class MobTargetsScreen extends Screen {
     private List<PlayerMobTargetsSyncPayload.Entry> targets = new ArrayList<>();
     private int page;
     private int rowsPerPage;
+    private boolean requested;
 
     public MobTargetsScreen(Screen parent) {
         super(Component.literal("生物列表"));
@@ -40,6 +41,7 @@ public final class MobTargetsScreen extends Screen {
         int pageCount = pageCount();
         if (page >= pageCount) page = pageCount - 1;
         clearWidgets();
+        if (!requested) { requested = true; requestList(); }
 
         int start = page * rowsPerPage;
         int end = Math.min(targets.size(), start + rowsPerPage);
@@ -153,8 +155,12 @@ public final class MobTargetsScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (current == this) current = null;
         minecraft.setScreen(parent);
+    }
+
+    @Override
+    public void removed() {
+        if (current == this) current = null;
     }
 
     @Override
