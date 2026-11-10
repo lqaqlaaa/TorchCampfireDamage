@@ -18,6 +18,7 @@ public final class ImGuiSettingsScreen extends Screen {
     private static final float[] DEMO_SLIDER = {6.0f};
     private static volatile ImGuiSettingsScreen activeScreen;
     private static boolean firstDrawLogged;
+    private static boolean vanillaRenderLogged;
     private static boolean firstWindowResultLogged;
     private final Screen parent;
     private int selectedPage;
@@ -34,6 +35,7 @@ public final class ImGuiSettingsScreen extends Screen {
         super.init();
         activeScreen = this;
         firstDrawLogged = false;
+        vanillaRenderLogged = false;
         firstWindowResultLogged = false;
         ClientDebugLog.info("ImGuiSettingsScreen.init completed; guiSize=" + width + "x" + height
                 + ", activeScreenAssigned=true.");
@@ -42,7 +44,8 @@ public final class ImGuiSettingsScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // ImGuiMC renders this screen from its post-frame event.
-        if (!firstDrawLogged) {
+        if (!vanillaRenderLogged) {
+            vanillaRenderLogged = true;
             ClientDebugLog.info("Vanilla Screen.render callback reached; ImGuiMC event should draw on top.");
         }
     }
