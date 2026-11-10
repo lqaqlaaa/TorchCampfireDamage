@@ -35,6 +35,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
+import net.neoforged.neoforge.event.entity.living.LootingLevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
@@ -69,7 +70,7 @@ public class DamageEventHandler {
     private static final Map<Mob, Long> GLOW_EXPIRY = new HashMap<>();
     private static boolean DEBUG_PRINTED = false;
 
-    public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
+    public record DropTarget(BlockPos pos, boolean drops, boolean xp, int lootingLevel) {}
 
     /* ================= 登记 ================= */
 
@@ -280,7 +281,10 @@ public class DamageEventHandler {
 
             if (tpDrops || tpXp) {
                 UUID id = mob.getUUID();
-                entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp));
+                int lootingLevel = ward.getAttackEnchantments().entrySet().stream()
+                        .filter(entry -> entry.getKey().toString().equals("minecraft:looting"))
+                        .mapToInt(Map.Entry::getValue).max().orElse(0);
+                entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp, Math.max(0, lootingLevel)));
                 CONSUMED.remove(id);
                 pendingCleanup.put(id, gameTime);
             }
@@ -374,7 +378,7 @@ public class DamageEventHandler {
     public static void putDropTarget(UUID entityId, net.minecraft.core.BlockPos pos,
                                      boolean drops, boolean xp) {
         if (drops || xp) {
-            entityDropTargets.put(entityId, new DropTarget(pos, drops, xp));
+            entityDropTargets.put(entityId, new DropTarget(pos, drops, xp, 0));
             CONSUMED.remove(entityId);
             pendingCleanup.put(entityId, 0L);
         }
@@ -416,6 +420,15 @@ public class DamageEventHandler {
     }
 
     /* ================= 掉落物传送 ================= */
+
+    /** 抢夺在战利品表生成阶段读取，而不是攻击伤害阶段；为本火把击杀临时注入等级。 */
+    @SubscribeEvent
+    public void onLootingLevel(LootingLevelEvent event) {
+        DropTarget target = entityDropTargets.get(event.getEntity().getUUID());
+        if (target != null && target.lootingLevel() > 0) {
+            event.setLootingLevel(Math.max(event.getLootingLevel(), target.lootingLevel()));
+        }
+    }
 
     @SubscribeEvent
     public void onLivingDrops(LivingDropsEvent event) {
