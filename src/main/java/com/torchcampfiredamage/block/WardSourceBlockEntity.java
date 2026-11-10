@@ -45,7 +45,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
     /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
-    /** 本根火把启用的伤害方式；旧存档中的附魔配置升级后不再参与攻击。 */
+    /** 本根火把启用的特殊伤害方式。 */
     private final java.util.Set<String> specialDamageTypes = new java.util.TreeSet<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
