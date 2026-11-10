@@ -133,13 +133,13 @@ public class WardMobTargetsScreen extends Screen {
         rowButtons.clear();
 
         List<MobEntry> entries = filteredEntries();
-        int maxScroll = Math.max(0, entries.size() - rowsPerPage);
-        scroll = Math.max(0, Math.min(scroll, maxScroll));
         int panelWidth = Math.min(390, this.width - 20);
         int left = (this.width - panelWidth) / 2;
         int top = 58;
         int rowHeight = 44;
         rowsPerPage = Math.max(1, Math.min(7, (this.height - 112) / rowHeight));
+        int maxScroll = Math.max(0, entries.size() - rowsPerPage);
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
         for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             int y = top + row * rowHeight + 18;
