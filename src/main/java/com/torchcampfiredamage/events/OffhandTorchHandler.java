@@ -25,11 +25,11 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import java.util.*;
 
 /**
- * 副手火把效果。
+ * Curios 守卫护符效果（玩家级攻击源）。
  * <p>
- * 仅在 Curios 饰品栏装备守卫护符时生效；不再支持副手持有触发。
+ * 仅在 Curios 饰品栏装备守卫护符时生效；主手/副手持有物品均不会触发。
  * 伤害值取玩家当前的 ATTACK_DAMAGE 属性（含武器/附魔/修饰符）。
- * 默认每 tick 一次、不播报、不吸掉落物/经验。
+ * 攻击名单保存在玩家级 SavedData，与每根放置火把的名单互不影响。
  */
 public class OffhandTorchHandler {
     private static final int CHUNK = SectionPos.SECTION_SIZE;
@@ -103,11 +103,11 @@ public class OffhandTorchHandler {
 
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
                 if (!mob.isAlive()) continue;
-                // 持有副手火把时的服务端扫描同样自动记录发现的实体类型。
+                // 护符攻击范围内自动记录发现的实体类型；名单保存在玩家级 SavedData。
                 PlayerMobTargetsData mobTargets = PlayerMobTargetsData.get(level.getServer());
                 mobTargets.discover(sp.getUUID(), net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()), isHostile(mob));
                 if (done.contains(mob.getUUID())) continue;
-                // 与方块火把一致：跳过被命名的生物（白名单保护）
+                // 与放置火把一致：跳过被命名的生物（白名单保护）
                 if (ignoreNamed && mob.hasCustomName()) continue;
                 // 显式名单只覆盖对应实体；名单外继续执行原有敌对/仇恨判定。
                 if (mobTargets.hasOverride(sp.getUUID(), mob.getType())) {
