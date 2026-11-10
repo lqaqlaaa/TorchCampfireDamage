@@ -81,7 +81,7 @@ public class WardMobTargetsScreen extends Screen {
         for (ResourceLocation id : allIds) {
             Mob mob = nearby.get(id);
             boolean configured = targets.containsKey(id);
-            boolean defaultEnabled = mob != null && isHostile(mob);
+            boolean defaultEnabled = allIds.getOrDefault(id, false);
             boolean enabled = configured ? targets.get(id) : defaultEnabled;
             String name = mob == null
                     ? BuiltInRegistries.ENTITY_TYPE.getOptional(id).map(t -> t.getDescription().getString()).orElse(id.toString())
