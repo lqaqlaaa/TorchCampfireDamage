@@ -56,8 +56,8 @@ public class GlobalSettingsScreen extends Screen {
     private int activeCategory = 0;
 
     private List<Row> visibleRows() {
-        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 18;
-        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 18 : allRows.size();
+        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 20;
+        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 20 : allRows.size();
         return allRows.subList(Math.min(from, allRows.size()), Math.min(to, allRows.size()));
     }
 
@@ -103,6 +103,10 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.OFFHAND_CHUNK_RADIUS.get(), v -> ModConfig.OFFHAND_CHUNK_RADIUS.set(v)));
         allRows.add(intRow("副手间隔", "tick 数，1 = 每 tick，20 = 1 秒",
                 () -> ModConfig.OFFHAND_INTERVAL.get(), v -> ModConfig.OFFHAND_INTERVAL.set(v)));
+        allRows.add(boolRow("固定伤害模式", "关闭：使用玩家攻击力；开启：使用下方固定伤害",
+                () -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.set(v)));
+        allRows.add(dblRow("副手固定伤害", "仅固定伤害模式生效，2.0 = 1 颗心",
+                () -> ModConfig.OFFHAND_FIXED_DAMAGE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE.set(Math.max(0.0, Math.min(2048.0, v)))));
         allRows.add(boolRow("副手播报", "副手击杀时是否播报",
                 () -> ModConfig.OFFHAND_ANNOUNCE.get(), v -> ModConfig.OFFHAND_ANNOUNCE.set(v)));
         allRows.add(boolRow("副手发光", "被攻击目标获得发光效果",
@@ -400,7 +404,7 @@ public class GlobalSettingsScreen extends Screen {
 
         // 页码信息
         String pg = "第 " + (page + 1) + " / " + pageCount + " 页";
-        String categoryName = activeCategory == 0 ? "全局规则" : activeCategory == 1 ? "副手火把设置" : "新放置火把默认值";
+        String categoryName = activeCategory == 0 ? "全局规则" : activeCategory == 1 ? "副手火把设置" : activeCategory == 2 ? "新放置火把默认值" : "生物列表";
         gg.drawCenteredString(this.font, categoryName + "  ·  " + pg, this.width / 2, 18, 0xAAAAAA);
 
         // 标签
