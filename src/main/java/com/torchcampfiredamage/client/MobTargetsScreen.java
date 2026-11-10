@@ -220,8 +220,8 @@ public final class MobTargetsScreen extends Screen {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         GuiLayout.drawFrame(graphics, this.width, this.height);
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(font, "副手火把 / 护符 · 附近生物", width / 2, 10, 0xFFD700);
-        graphics.drawCenteredString(font, "扫描副手攻击范围；敌对/仇恨生物默认开启，其他生物默认关闭",
+        graphics.drawCenteredString(font, "饰品栏护符 · 附近生物", width / 2, 10, 0xFFD700);
+        graphics.drawCenteredString(font, "扫描玩家周围的护符攻击范围；敌对/仇恨生物默认开启，其他生物默认关闭",
                 width / 2, 24, 0xAAAAAA);
         List<PlayerMobTargetsSyncPayload.Entry> filtered = filteredEntries();
         graphics.drawCenteredString(font, "第 " + (page + 1) + " / " + pageCount()
