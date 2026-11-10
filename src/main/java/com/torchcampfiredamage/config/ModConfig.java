@@ -49,6 +49,7 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_DROPS;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_XP;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_IGNORE_NAMED_MOBS;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_FORCE_ONE_HEALTH;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -164,6 +165,7 @@ public class ModConfig {
         OFFHAND_TELEPORT_DROPS = builder.comment("护符击杀是否传送掉落物").define("teleportDrops", false);
         OFFHAND_TELEPORT_XP = builder.comment("护符击杀是否传送经验").define("teleportExperience", false);
         OFFHAND_IGNORE_NAMED_MOBS = builder.comment("护符是否忽略已命名生物").define("ignoreNamedMobs", true);
+        OFFHAND_FORCE_ONE_HEALTH = builder.comment("护符攻击前是否将目标生命值压至 1 HP，再使用玩家伤害来源攻击").define("forceOneHealth", false);
 
         builder.pop();
 
