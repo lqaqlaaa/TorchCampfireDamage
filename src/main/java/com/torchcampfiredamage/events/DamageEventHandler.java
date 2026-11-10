@@ -3,6 +3,7 @@ package com.torchcampfiredamage.events;
 import com.torchcampfiredamage.TorchCampfireDamage;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
+import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -257,6 +258,7 @@ public class DamageEventHandler {
         for (Mob mob : candidates) {
             if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
+            if (owner != null && !PlayerMobTargetsData.get(level.getServer()).isEnabled(owner.getUUID(), mob.getType())) continue;
             if (!isHostileToPlayers(mob)) continue;
 
             if (glowing) {
