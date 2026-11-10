@@ -11,7 +11,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import foundry.imgui.api.ImGuiMCEvents;
 
 /**
  * 客户端：右键守卫火把直接打开设置界面（不需要潜行）。
@@ -23,32 +22,10 @@ import foundry.imgui.api.ImGuiMCEvents;
 public class ClientEvents {
 
     private static boolean wasUsePressed = false;
-    private static long imguiPostEvents;
     private static boolean firstClientTickLogged;
 
     static {
         ClientDebugLog.info("ClientEvents class initialized; client event subscriber loaded.");
-        try {
-            ImGuiMCEvents.INSTANCE.postRenderImGuiEvent(() -> {
-                imguiPostEvents++;
-                if (imguiPostEvents == 1 || imguiPostEvents % 120 == 0) {
-                    ClientDebugLog.info("ImGuiMC API post-render callback received; count=" + imguiPostEvents
-                            + ", screen=" + screenName(Minecraft.getInstance().screen));
-                }
-                try {
-                    ImGuiSettingsScreen.renderActiveImGui();
-                } catch (Throwable throwable) {
-                    ClientDebugLog.error("Exception while drawing settings UI from ImGuiMC callback.", throwable);
-                }
-            });
-            ClientDebugLog.info("Registered ImGuiMC post-render callback through ImGuiMCEvents API.");
-        } catch (Throwable throwable) {
-            ClientDebugLog.error("Failed to register ImGuiMC post-render callback through its API.", throwable);
-        }
-    }
-
-    private static String screenName(net.minecraft.client.gui.screens.Screen screen) {
-        return screen == null ? "<none>" : screen.getClass().getName();
     }
 
     @SubscribeEvent
@@ -64,7 +41,7 @@ public class ClientEvents {
             ClientDebugLog.info("O/settings key consumed; playerPresent=" + (player != null)
                     + ", levelPresent=" + (mc.level != null) + ", currentScreen=" + screenName(mc.screen));
             if (player != null && mc.level != null && mc.screen == null) {
-                ClientDebugLog.info("Opening ImGuiSettingsScreen from O key.");
+                ClientDebugLog.info("Opening minimal ImGui window test screen from O key.");
                 mc.setScreen(new ImGuiSettingsScreen(null));
             } else {
                 ClientDebugLog.info("O key ignored because world/player is unavailable or another screen is open.");
