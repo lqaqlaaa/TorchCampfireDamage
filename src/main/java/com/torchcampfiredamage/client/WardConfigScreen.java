@@ -110,7 +110,7 @@ public class WardConfigScreen extends Screen {
         rightColumnX = contentX + (columns == 2 ? colW + columnGap : 0);
         clearWidgets();
 
-        String[] nav = {"参数设置", "生物列表", "添加附魔", "显示设置", "星环设置", "全局设置"};
+        String[] nav = {"参数设置", "生物列表", "伤害类型", "显示设置", "星环设置", "全局设置"};
         int navY = 46;
         int navGap = 3;
         int navH = Math.max(15, Math.min(23, (height - 78 - navGap * 5) / 6));
@@ -119,7 +119,7 @@ public class WardConfigScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal(nav[i]), b -> {
                 switch (item) {
                     case 1 -> Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be));
-                    case 2 -> Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments()));
+                    case 2 -> Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getSpecialDamageTypes()));
                     case 3 -> { DisplaySettingsScreen.loadFrom(be); Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this)); }
                     case 4 -> { RingSettingsScreen.loadFrom(be); Minecraft.getInstance().setScreen(new RingSettingsScreen(this)); }
                     case 5 -> Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this));
