@@ -58,8 +58,8 @@ public class GlobalSettingsScreen extends Screen {
     private int activeCategory = 0;
 
     private List<Row> visibleRows() {
-        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 20;
-        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 20 : allRows.size();
+        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 21;
+        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 21 : allRows.size();
         return allRows.subList(Math.min(from, allRows.size()), Math.min(to, allRows.size()));
     }
 
@@ -119,6 +119,8 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.OFFHAND_TELEPORT_DROPS.get(), v -> ModConfig.OFFHAND_TELEPORT_DROPS.set(v)));
         allRows.add(boolRow("护符传经验", "护符击杀经验球传送到玩家",
                 () -> ModConfig.OFFHAND_TELEPORT_XP.get(), v -> ModConfig.OFFHAND_TELEPORT_XP.set(v)));
+        allRows.add(boolRow("护符忽略命名生物", "护符不会攻击带有自定义名称的生物",
+                () -> ModConfig.OFFHAND_IGNORE_NAMED_MOBS.get(), v -> ModConfig.OFFHAND_IGNORE_NAMED_MOBS.set(v)));
 
         // --- 新火把默认值 ---
         allRows.add(boolRow("默认启用", "新放置的火把是否默认开启",
