@@ -3,6 +3,7 @@ package com.torchcampfiredamage.client;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import com.torchcampfiredamage.client.ModKeyMappings;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -26,6 +27,12 @@ public class ClientEvents {
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
+        if (ModKeyMappings.OPEN_SETTINGS.consumeClick()) {
+            if (player != null && mc.level != null && mc.screen == null) {
+                mc.setScreen(new GlobalSettingsScreen(null));
+            }
+            return;
+        }
         if (player == null || mc.level == null) {
             wasUsePressed = false;
             return;
