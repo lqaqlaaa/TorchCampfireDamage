@@ -58,7 +58,7 @@ public class GlobalSettingsScreen extends Screen {
     private int activeCategory = 0;
 
     private List<Row> visibleRows() {
-        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 21;
+        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 22;
         int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 22 : allRows.size();
         return allRows.subList(Math.min(from, allRows.size()), Math.min(to, allRows.size()));
     }
