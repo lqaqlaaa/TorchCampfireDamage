@@ -83,6 +83,7 @@ public record UpdateWardPayload(
             if (!(player.level() instanceof ServerLevel level)) return;
 
             BlockPos pos = p.pos();
+            if (!level.hasChunkAt(pos) || !level.getWorldBorder().isWithinBounds(pos)) return;
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64.0) {
                 return;
             }
