@@ -42,6 +42,8 @@ public class GlobalSettingsScreen extends Screen {
     private int labelW;          // 实际标签宽
     private int cols;            // 实际列数（1 或 2）
     private int rowsPerPage;     // 每页行数
+    private int sideW;
+    private int contentX, contentY, contentW, contentH;
 
     /* ===== 数据 ===== */
     private interface Row {
@@ -202,57 +204,26 @@ public class GlobalSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        /* -------- 1. 决定列数：窄屏单列，宽屏双列 -------- */
-        // 单列最小需要 ≈ 标签 68 + 控件 76 = 144
-        int minColW = 68 + 76;
-        cols = (this.width >= minColW * 2 + 24) ? 2 : 1;
+        // 左侧导航与右侧内容区始终按逻辑分辨率计算，适配 GUI 缩放。
+        sideW = Math.max(76, Math.min(104, this.width / 4));
+        contentX = 12 + sideW + 8;
+        contentY = 42;
+        contentW = Math.max(120, this.width - contentX - 12);
+        contentH = Math.max(48, this.height - contentY - 36);
 
-        /* -------- 2. 决定控件宽度 -------- */
-        int usableW = this.width - 16;                       // 左右各留 8
-        boxW = BOX_W_MAX;
-        labelW = 68;
-        int colW = labelW + boxW;
-        int needW = colW * cols + (cols > 1 ? 10 : 0);
-        if (needW > usableW) {
-            // 宽度不够：先压控件宽度
-            int shrink = needW - usableW;
-            boxW = Math.max(48, boxW - shrink / cols);
-            colW = labelW + boxW;
-            needW = colW * cols + (cols > 1 ? 10 : 0);
-            // 还不够就压标签宽度
-            if (needW > usableW) {
-                labelW = Math.max(44, labelW - (needW - usableW) / cols);
-                colW = labelW + boxW;
-            }
-        }
+        cols = contentW >= 430 ? 2 : 1;
+        int gap = cols == 2 ? 14 : 0;
+        int colW = (contentW - gap) / cols;
+        labelW = Math.min(112, Math.max(64, colW / 2));
+        boxW = Math.max(48, colW - labelW - 12);
+        boxH = 20;
+        rowH = 30;
+        rowsPerPage = Math.max(1, Math.min(8, contentH / rowH));
 
-        /* -------- 3. 决定行高：按可用高度压缩 -------- */
-        int availH = this.height - RESERVED_TOP - RESERVED_BOTTOM;
-        int maxRowsByHeight = Math.max(1, availH / (BOX_H + 2));
-
-        // 每页能放多少「项」（项 = 一个控件）
-        int itemsPerPageByHeight = maxRowsByHeight * cols;
-        // 这里固定每页 8 项，避免翻页太碎；若屏幕装不下则按能装的走
-        int wantPerPage = 8;
-        int itemsPerPage = Math.min(wantPerPage, Math.max(cols, itemsPerPageByHeight));
-        rowsPerPage = Math.max(1, itemsPerPage / cols);
-
-        // 行高 = 可用高度 / 实际行数，夹在 [MIN_ROW_H, BOX_H+2]
-        rowH = Math.min(BOX_H + 2, Math.max(MIN_ROW_H, availH / rowsPerPage));
-        boxH = Math.min(BOX_H, rowH - 1);
-        if (boxH < 10) boxH = 10;
-
-        /* -------- 4. 分页数 -------- */
-        pageCount = Math.max(1, (visibleRows().size() + itemsPerPage - 1) / itemsPerPage);
+        List<Row> rows = visibleRows();
+        int perPage = rowsPerPage * cols;
+        pageCount = Math.max(1, (rows.size() + perPage - 1) / perPage);
         if (page >= pageCount) page = pageCount - 1;
-
-        /* -------- 5. 定位 -------- */
-        int blockW = colW * cols + (cols > 1 ? 10 : 0);
-        this.px = (this.width - blockW) / 2;
-        // 内容垂直居中于「标题之下、按钮之上」的区域
-        int contentH = rowsPerPage * rowH;
-        this.py = RESERVED_TOP + Math.max(0, (availH - contentH) / 2);
-
         buildPage();
     }
 
@@ -264,31 +235,17 @@ public class GlobalSettingsScreen extends Screen {
     private void buildPage() {
         this.clearWidgets();
 
-        int start = page * itemsPerPage();
-        List<Row> rows = visibleRows();
-        int end = Math.min(rows.size(), start + itemsPerPage());
-
-        int colStep = labelW + boxW + 10;
-
-        for (int i = start; i < end; i++) {
-            int idx = i - start;
-            int col = idx % cols;
-            int rowIdx = idx / cols;
-            int x = px + col * colStep + labelW;
-            int y = py + rowIdx * rowH;
-            rows.get(i).build(this, x, y);
-        }
-
-        // 顶部分类导航：让设置归属一眼可见
-        int tabY = 30;
-        int tabGap = 4;
-        int tabW = Math.max(48, Math.min(104, (this.width - 24 - tabGap * 3) / 4));
-        int tabX = (this.width - (tabW * 4 + tabGap * 3)) / 2;
-        String[] tabs = {"全局规则", "副手火把", "新火把", "生物列表"};
+        // 左侧分类导航
+        int navX = 12;
+        int navY = 48;
+        int navButtonH = 24;
+        int navGap = 5;
+        String[] tabs = {"通用设置", "副手火把", "放置火把", "生物列表"};
+        String[] icons = {"⚙", "⚔", "✦", "♟"};
         for (int i = 0; i < tabs.length; i++) {
             final int category = i;
-            Component label = Component.literal((activeCategory == i ? "§e▶ " : "") + tabs[i]);
-            addRenderableWidget(Button.builder(label, b -> {
+            String label = icons[i] + " " + tabs[i];
+            Button button = Button.builder(Component.literal(label), b -> {
                 if (category == 3) {
                     minecraft.setScreen(new MobTargetsScreen(this));
                     return;
@@ -296,58 +253,50 @@ public class GlobalSettingsScreen extends Screen {
                 activeCategory = category;
                 page = 0;
                 init();
-            }).bounds(tabX + i * (tabW + tabGap), tabY, tabW, 18).build());
+            }).bounds(navX, navY + i * (navButtonH + navGap), sideW, navButtonH).build();
+            addRenderableWidget(button);
         }
 
-        /* ---- 底部按钮：两行，全部保证在屏幕内 ---- */
-        int cx = this.width / 2;
+        // 当前分类的设置项
+        int start = page * itemsPerPage();
+        List<Row> rows = visibleRows();
+        int end = Math.min(rows.size(), start + itemsPerPage());
+        int gap = cols == 2 ? 14 : 0;
+        int colW = (contentW - gap) / cols;
+        int top = contentY + 25;
+        for (int i = start; i < end; i++) {
+            int idx = i - start;
+            int col = idx % cols;
+            int rowIdx = idx / cols;
+            int baseX = contentX + col * (colW + gap);
+            int y = top + rowIdx * rowH;
+            rows.get(i).build(this, baseX + labelW + 8, y);
+        }
 
-        // 第一行：翻页 + 恢复默认
-        int bw = Math.max(40, Math.min(72, (this.width - 32) / 3));
-        int gap = 6;
-        int totalBW = bw * 3 + gap * 2;
-        int bx0 = cx - totalBW / 2;
-
-        // 从屏幕底部往上排，确保不出界
-        int byClose = this.height - 24;          // 关闭按钮所在行
-        int byMain = byClose - 24;               // 翻页那行
-
+        // 分页与操作按钮
+        int footerY = this.height - 25;
+        int smallW = Math.max(38, Math.min(58, (contentW - 12) / 3));
+        int footerGap = 5;
+        int total = smallW * 3 + footerGap * 2;
+        int footerX = contentX + Math.max(0, (contentW - total) / 2);
         addRenderableWidget(Button.builder(Component.literal("◀"), b -> {
             if (page > 0) { page--; buildPage(); }
-        }).bounds(bx0, byMain, bw, 20)
-                .tooltip(Tooltip.create(Component.literal("上一页")))
-                .build());
-
+        }).bounds(footerX, footerY, smallW, 20).tooltip(Tooltip.create(Component.literal("上一页"))).build());
         addRenderableWidget(Button.builder(Component.literal("恢复默认"), b -> {
             resetToDefaults();
             buildPage();
-        }).bounds(bx0 + bw + gap, byMain, bw, 20)
-                .tooltip(Tooltip.create(Component.literal("恢复所有全局配置为默认值")))
-                .build());
-
+        }).bounds(footerX + smallW + footerGap, footerY, smallW, 20)
+                .tooltip(Tooltip.create(Component.literal("恢复全局配置默认值"))).build());
         addRenderableWidget(Button.builder(Component.literal("▶"), b -> {
             if (page + 1 < pageCount) { page++; buildPage(); }
-        }).bounds(bx0 + (bw + gap) * 2, byMain, bw, 20)
-                .tooltip(Tooltip.create(Component.literal("下一页")))
-                .build());
+        }).bounds(footerX + (smallW + footerGap) * 2, footerY, smallW, 20)
+                .tooltip(Tooltip.create(Component.literal("下一页"))).build());
 
-        // 第二行：保存并返回 / 取消
-        int bw2 = Math.max(52, Math.min(88, (this.width - 32) / 2));
-        int gap2 = 8;
-        int bx2 = cx - (bw2 * 2 + gap2) / 2;
-
-        addRenderableWidget(Button.builder(Component.literal("保存并返回"), b -> {
+        int backW = Math.min(76, Math.max(52, sideW - 4));
+        addRenderableWidget(Button.builder(Component.literal("返回"), b -> {
             saveConfig();
             minecraft.setScreen(parent);
-        }).bounds(bx2, byClose, bw2, 20)
-                .tooltip(Tooltip.create(Component.literal("保存所有修改并返回上一级")))
-                .build());
-
-        addRenderableWidget(Button.builder(Component.literal("取消"), b -> {
-            minecraft.setScreen(parent);
-        }).bounds(bx2 + bw2 + gap2, byClose, bw2, 20)
-                .tooltip(Tooltip.create(Component.literal("不保存，直接返回")))
-                .build());
+        }).bounds(navX, this.height - 25, backW, 20).build());
     }
 
     /* ================= 工具 ================= */
@@ -397,32 +346,41 @@ public class GlobalSettingsScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
+
+        // 石质面板与分区底色
+        int panel = 0xE8202020;
+        int border = 0xFF777777;
+        gg.fill(6, 6, this.width - 6, this.height - 6, 0xD8101010);
+        gg.fill(7, 7, this.width - 7, 30, 0xFF292929);
+        gg.fill(8, 32, 12 + sideW, this.height - 8, panel);
+        gg.fill(contentX - 2, 32, this.width - 8, this.height - 8, panel);
+        gg.renderOutline(6, 6, this.width - 12, this.height - 12, border);
+        gg.renderOutline(8, 32, sideW + 4, this.height - 40, 0xFF555555);
+        gg.renderOutline(contentX - 2, 32, this.width - contentX - 6, this.height - 40, 0xFF555555);
+
         super.render(gg, mouseX, mouseY, partialTick);
 
-        // 标题（在最上方）
-        gg.drawCenteredString(this.font, "全局设置", this.width / 2, 6, 0xFFD700);
+        String categoryName = activeCategory == 0 ? "通用设置" : activeCategory == 1 ? "副手火把设置" : "放置火把默认设置";
+        gg.drawString(font, "守卫火把", 16, 12, 0xFFFFD76A, false);
+        gg.drawString(font, categoryName, contentX + 8, 12, 0xFFFFFFFF, false);
+        gg.drawString(font, "第 " + (page + 1) + " / " + pageCount + " 页", this.width - 70, 12, 0xFFB8B8B8, false);
 
-        // 页码信息
-        String pg = "第 " + (page + 1) + " / " + pageCount + " 页";
-        String categoryName = activeCategory == 0 ? "全局规则" : activeCategory == 1 ? "副手火把设置" : activeCategory == 2 ? "新放置火把默认值" : "生物列表";
-        gg.drawCenteredString(this.font, categoryName + "  ·  " + pg, this.width / 2, 18, 0xAAAAAA);
-
-        // 标签
         int start = page * itemsPerPage();
         List<Row> rows = visibleRows();
         int end = Math.min(rows.size(), start + itemsPerPage());
-        int colStep = labelW + boxW + 10;
-
+        int gap = cols == 2 ? 14 : 0;
+        int colW = (contentW - gap) / cols;
+        int top = contentY + 25;
         for (int i = start; i < end; i++) {
             int idx = i - start;
             int col = idx % cols;
             int rowIdx = idx / cols;
-            int lx = px + col * colStep;
-            int ly = py + rowIdx * rowH;
-            // 垂直居中对齐控件
-            int textY = ly + (boxH - 8) / 2;
-            gg.drawString(this.font, rows.get(i).label(), lx, textY, 0xFFFFFF);
+            int baseX = contentX + col * (colW + gap);
+            int y = top + rowIdx * rowH;
+            gg.fill(baseX + 2, y - 3, baseX + colW - 2, y + 24, 0x553F3F3F);
+            gg.drawString(font, rows.get(i).label(), baseX + 7, y + 6, 0xFFE6E6E6, false);
         }
+        gg.drawString(font, "配置会即时生效；返回时保存", contentX + 8, this.height - 38, 0xFFAAAAAA, false);
     }
 
     @Override
