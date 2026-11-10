@@ -24,6 +24,7 @@ public class WardMobTargetsScreen extends Screen {
     private final Map<ResourceLocation, Boolean> targets = new TreeMap<>();
     private EditBox search;
     private int scroll;
+    private final List<Button> rowButtons = new ArrayList<>();
 
     private record MobEntry(ResourceLocation id, String name, boolean installed) {}
 
@@ -70,10 +71,9 @@ public class WardMobTargetsScreen extends Screen {
     }
 
     private void rebuildRows() {
-        // 删除旧行按钮，只保留搜索框与底部返回按钮。
-        this.children().removeIf(child -> child instanceof Button);
-        this.renderables.removeIf(renderable -> renderable instanceof Button);
-        this.narratables.removeIf(narratable -> narratable instanceof Button);
+        // 只重建列表操作按钮，搜索框和返回按钮保持不动。
+        for (Button button : rowButtons) removeWidget(button);
+        rowButtons.clear();
 
         List<MobEntry> entries = filteredEntries();
         int maxScroll = Math.max(0, entries.size() - ROWS);
@@ -86,21 +86,16 @@ public class WardMobTargetsScreen extends Screen {
             MobEntry entry = entries.get(row + scroll);
             int y = top + row * rowHeight;
             Boolean enabled = targets.get(entry.id());
-            String state = enabled == null ? "未添加" : (enabled ? "已启用" : "已停用");
-            String label = entry.name() + "  [" + entry.id() + "]  " + (entry.installed() ? state : "未安装");
             int labelWidth = panelWidth - 116;
-            addRenderableWidget(Button.builder(Component.literal(label), b -> {})
-                    .bounds(left, y, labelWidth, 20).build());
-
             if (enabled == null) {
-                addRenderableWidget(Button.builder(Component.literal("添加"), b -> change(entry.id(), true))
-                        .bounds(left + labelWidth + 4, y, 52, 20).build());
+                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("添加"), b -> change(entry.id(), true))
+                        .bounds(left + labelWidth + 4, y, 52, 20).build()));
             } else {
-                addRenderableWidget(Button.builder(Component.literal(enabled ? "停用" : "启用"),
+                rowButtons.add(addRenderableWidget(Button.builder(Component.literal(enabled ? "停用" : "启用"),
                                 b -> change(entry.id(), !enabled))
-                        .bounds(left + labelWidth + 4, y, 52, 20).build());
-                addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(entry.id()))
-                        .bounds(left + labelWidth + 60, y, 52, 20).build());
+                        .bounds(left + labelWidth + 4, y, 52, 20).build()));
+                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(entry.id()))
+                        .bounds(left + labelWidth + 60, y, 52, 20).build()));
             }
         }
     }
@@ -134,6 +129,17 @@ public class WardMobTargetsScreen extends Screen {
         gg.drawString(font, "空名单时沿用默认敌对目标；配置后仅攻击已启用的生物", 12, height - 54, 0xAAAAAA);
         List<MobEntry> entries = filteredEntries();
         gg.drawString(font, "生物类型: " + entries.size() + "    滚轮翻页", 12, 53, 0x888888);
+        int panelWidth = Math.min(390, this.width - 20);
+        int left = (this.width - panelWidth) / 2;
+        for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
+            MobEntry entry = entries.get(row + scroll);
+            Boolean enabled = targets.get(entry.id());
+            String state = enabled == null ? "未添加" : (enabled ? "已启用" : "已停用");
+            String suffix = entry.installed() ? state : "未安装";
+            String label = font.plainSubstrByWidth(entry.name() + " [" + entry.id() + "] · " + suffix,
+                    panelWidth - 122);
+            gg.drawString(font, label, left, 64 + row * 25 + 6, entry.installed() ? 0xFFFFFF : 0xFF7777);
+        }
     }
 
     @Override
