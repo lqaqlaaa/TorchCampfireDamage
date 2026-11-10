@@ -9,7 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.level.SavedData;
+import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.*;
 
@@ -81,20 +81,21 @@ public class PlayerMobTargetsData extends SavedData {
 
     public boolean record(ServerPlayer player, Mob mob) {
         ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
-        return id != null && discover(player.getUUID(), id);
+        return id != null && discover(player.getUUID(), id, false);
     }
-    public boolean discover(UUID player, ResourceLocation id) {
+    public boolean discover(UUID player, ResourceLocation id, boolean enabled) {
         if (id == null) return false;
-        boolean added = discovered.computeIfAbsent(player, k -> new HashMap<>()).put(id, enabled);
-        if (added) setDirty();
-        return added;
+        Map<ResourceLocation, Boolean> seen = discovered.computeIfAbsent(player, k -> new HashMap<>());
+        boolean changed = !seen.containsKey(id) || seen.get(id) != enabled;
+        if (changed) { seen.put(id, enabled); setDirty(); }
+        return changed;
     }
     public void delete(UUID player, ResourceLocation id) {
         boolean changed = false;
         Map<ResourceLocation, Boolean> overrides = players.get(player);
         if (overrides != null) changed |= overrides.remove(id) != null;
-        Set<ResourceLocation> seen = discovered.get(player);
-        if (seen != null) changed |= seen.remove(id);
+        Map<ResourceLocation, Boolean> seen = discovered.get(player);
+        if (seen != null) changed |= seen.remove(id) != null;
         if (changed) setDirty();
     }
     public boolean hasOverride(UUID player, EntityType<?> type) {
@@ -119,7 +120,7 @@ public class PlayerMobTargetsData extends SavedData {
         Map<ResourceLocation, Boolean> targets = players.computeIfAbsent(player, k -> new HashMap<>());
         if (!targets.containsKey(id) || targets.get(id) != enabled) {
             targets.put(id, enabled);
-            discovered.computeIfAbsent(player, k -> new HashSet<>()).add(id);
+            discovered.computeIfAbsent(player, k -> new HashMap<>()).put(id, enabled);
             setDirty();
         }
     }
