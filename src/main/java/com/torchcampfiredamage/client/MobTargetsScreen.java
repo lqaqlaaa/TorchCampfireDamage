@@ -270,7 +270,8 @@ public final class MobTargetsScreen extends Screen {
         graphics.fill(x, y, x + boxW, y + boxH, 0xF0101724);
         graphics.fill(x, y, x + boxW, y + 2, 0xFF398BFF);
         graphics.renderOutline(x, y, boxW, boxH, 0xFF42658E);
-        graphics.drawCenteredString(font, font.plainSubstrByWidth(name, boxW - 12), x + boxW / 2, y + 7, 0xFFFFFFFF);
+        String previewName = BuiltInRegistries.ENTITY_TYPE.getOptional(id).map(type -> type.getDescription().getString()).orElse(id.toString());
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(previewName, boxW - 12), x + boxW / 2, y + 7, 0xFFFFFFFF);
         try {
             preview.setNoAi(true);
             InventoryScreen.renderEntityInInventoryFollowsAngle(graphics, x + 8, y + 24,
