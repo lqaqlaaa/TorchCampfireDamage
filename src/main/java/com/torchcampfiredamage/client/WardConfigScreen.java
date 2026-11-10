@@ -122,6 +122,13 @@ public class WardConfigScreen extends Screen {
         addRenderableWidget(intervalBox);
         y += ROW_H;
 
+        // 当前方块火把独立的攻击生物名单。
+        addRenderableWidget(Button.builder(Component.literal("攻击生物名单"), b ->
+                Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be)))
+                .bounds(left, y, BTN_W, 20)
+                .tooltip(Tooltip.create(Component.literal("只影响坐标对应的这一根火把")))
+                .build());
+
         // ---- 右列：目标发光 / 目标减速 / 击杀播报 / 传送掉落物 / 传送经验 ----
         int ry = top;
         addRenderableWidget(Button.builder(onOffText(glowing), b -> {
@@ -378,7 +385,7 @@ public class WardConfigScreen extends Screen {
                 _left, _top - 10, 0xAAAAAA);
 
         // 左列标签
-        String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔"};
+        String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔", "攻击生物"};
         for (int i = 0; i < leftLabels.length; i++) {
             gg.drawString(this.font, leftLabels[i], _left - 56, _top + i * ROW_H + 6, 0xFFFFFF);
         }
