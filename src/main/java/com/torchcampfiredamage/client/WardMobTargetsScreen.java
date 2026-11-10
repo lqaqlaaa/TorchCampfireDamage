@@ -70,15 +70,15 @@ public class WardMobTargetsScreen extends Screen {
             ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
             if (id != null) {
                 nearby.putIfAbsent(id, mob);
-                PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 3, id.toString(), false));
+                PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 3, id.toString(), isHostile(mob)));
             }
         }
 
         String q = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
         List<MobEntry> result = new ArrayList<>();
-        Set<ResourceLocation> allIds = new TreeSet<>(ward.getDiscoveredMobTargets());
-        allIds.addAll(nearby.keySet());
-        for (ResourceLocation id : allIds) {
+        Map<ResourceLocation, Boolean> allIds = new TreeMap<>(ward.getDiscoveredMobTargetDefaults());
+        for (ResourceLocation id : nearby.keySet()) allIds.put(id, isHostile(nearby.get(id)));
+        for (ResourceLocation id : allIds.keySet()) {
             Mob mob = nearby.get(id);
             boolean configured = targets.containsKey(id);
             boolean defaultEnabled = allIds.getOrDefault(id, false);
