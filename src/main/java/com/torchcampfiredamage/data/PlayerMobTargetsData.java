@@ -86,7 +86,7 @@ public class PlayerMobTargetsData extends SavedData {
 
     public void setEnabled(UUID player, ResourceLocation id, boolean enabled) {
         Map<ResourceLocation, Boolean> targets = players.computeIfAbsent(player, k -> new HashMap<>());
-        if (targets.containsKey(id) && targets.get(id) != enabled) {
+        if (!targets.containsKey(id) || targets.get(id) != enabled) {
             targets.put(id, enabled);
             setDirty();
         }
