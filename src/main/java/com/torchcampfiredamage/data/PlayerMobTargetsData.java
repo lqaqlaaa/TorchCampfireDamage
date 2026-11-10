@@ -68,7 +68,8 @@ public class PlayerMobTargetsData extends SavedData {
             ListTag seen = new ListTag();
             for (var seenEntry : discovered.getOrDefault(uuid, Map.of()).entrySet()) {
                 CompoundTag item = new CompoundTag();
-                item.putString("Id", id.toString());
+                item.putString("Id", seenEntry.getKey().toString());
+                item.putBoolean("Enabled", seenEntry.getValue());
                 seen.add(item);
             }
             pt.put("Discovered", seen);
