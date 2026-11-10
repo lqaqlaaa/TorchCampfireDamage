@@ -106,7 +106,7 @@ public class WardConfigScreen extends Screen {
             b.setMessage(rangeTypeText());
             rangeText = String.valueOf(convertRange());
             rangeBox.setValue(rangeText);
-        }).bounds(left, y, BTN_W, 20).build());
+        }).bounds(left, y, BTN_W, CONTROL_H).build());
         y += ROW_H;
 
         // 伤害范围（数值框）
@@ -137,7 +137,7 @@ public class WardConfigScreen extends Screen {
         // 当前方块火把独立的攻击生物名单。
         addRenderableWidget(Button.builder(Component.literal("攻击生物名单"), b ->
                 Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be)))
-                .bounds(left, y, BTN_W, 20)
+                .bounds(left, y, BTN_W, CONTROL_H)
                 .tooltip(Tooltip.create(Component.literal("只影响坐标对应的这一根火把")))
                 .build());
 
@@ -195,8 +195,8 @@ public class WardConfigScreen extends Screen {
         int gap = layoutGap
         int totalW = bw * 3 + gap * 2;
         int bx0 = cx - totalW / 2;
-        int by1 = top + ROW_H * 7 + 16;
-        int by2 = by1 + 24;
+        int by1 = top + ROW_H * 7 + GuiLayout.px(16, width, height, 8);
+        int by2 = by1 + GuiLayout.px(24, width, height, 12);
 
         // 第一行：显示范围 / 显示设置 / 保存
         addRenderableWidget(Button.builder(showRangeText(), b -> {
