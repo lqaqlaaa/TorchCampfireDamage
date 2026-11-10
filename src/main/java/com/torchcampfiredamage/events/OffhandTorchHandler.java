@@ -129,14 +129,21 @@ public class OffhandTorchHandler {
                 DamageSource src = level.damageSources().playerAttack(sp);
                 ItemStack weapon = sp.getMainHandItem();
                 float enchantedDamage = EnchantmentHelper.modifyDamage(level, weapon, mob, src, dmg);
-                boolean ok = mob.hurt(src, enchantedDamage);
-                if (ok) {
-                    // Apply weapon enchantment post-attack effects (e.g. fire aspect).
-                    EnchantmentHelper.doPostAttackEffectsWithItemSource(level, mob, src, weapon);
-                } else {
+                if (ModConfig.OFFHAND_FORCE_ONE_HEALTH.get()) {
+                    float originalHealth = mob.getHealth();
+                    mob.setHealth(1.0F);
                     mob.invulnerableTime = 0;
-                    mob.setHealth(Math.max(0f, mob.getHealth() - enchantedDamage));
-                    if (mob.getHealth() <= 0f) mob.die(src);
+                    boolean killed = mob.hurt(src, Math.max(1.0F, enchantedDamage));
+                    if (!killed && mob.isAlive()) mob.setHealth(originalHealth);
+                } else {
+                    boolean ok = mob.hurt(src, enchantedDamage);
+                    if (ok) {
+                        EnchantmentHelper.doPostAttackEffectsWithItemSource(level, mob, src, weapon);
+                    } else {
+                        mob.invulnerableTime = 0;
+                        mob.setHealth(Math.max(0f, mob.getHealth() - enchantedDamage));
+                        if (mob.getHealth() <= 0f) mob.die(src);
+                    }
                 }
                 done.add(mob.getUUID());
 
