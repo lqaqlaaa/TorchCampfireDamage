@@ -204,7 +204,7 @@ public final class MobTargetsScreen extends Screen {
         graphics.drawCenteredString(font, "第 " + (page + 1) + " / " + pageCount()
                 + " 页    当前范围内 " + visible.size() + " 种", width / 2, 36, 0xFFFFFF);
 
-        int rowHeight = 26;
+        int rowHeight = 34;
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
