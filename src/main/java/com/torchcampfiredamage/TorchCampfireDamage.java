@@ -1,6 +1,8 @@
 package com.torchcampfiredamage;
 
 import com.torchcampfiredamage.block.ModBlocks;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.api.distmarker.Dist;
 import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.events.DamageEventHandler;
 import com.torchcampfiredamage.events.InteractionHandler;
@@ -29,6 +31,9 @@ public class TorchCampfireDamage {
 
     public TorchCampfireDamage(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("[TorchCampfireDamage] Constructing mod...");
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            com.torchcampfiredamage.client.ClientImGuiBootstrap.register();
+        }
 
         // 配置
         modContainer.registerConfig(Type.COMMON, ModConfig.SPEC);
