@@ -140,7 +140,7 @@ public final class MobTargetsScreen extends Screen {
                 else graphics.drawString(font, "◆", left + 8, y + 8, 0xFFFFFF);
             }
             int nameMax = Math.max(20, listWidth - 170);
-            graphics.drawString(font, font.substr(Component.literal(displayName), nameMax), left + 30, y + 8,
+            graphics.drawString(font, font.plainSubstrByWidth(displayName, nameMax), left + 30, y + 8,
                     type == null ? 0xFF7777 : 0xFFFFFF);
             graphics.drawString(font, entry.entityId(), left + 30, y + 17, 0x888888);
         }
