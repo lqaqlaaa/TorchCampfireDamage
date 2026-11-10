@@ -126,7 +126,7 @@ public class WardMobTargetsScreen extends Screen {
         super.render(gg, mouseX, mouseY, partialTick);
         gg.drawCenteredString(font, "攻击生物名单", width / 2, 10, 0xFFFFFF);
         gg.drawString(font, "点击添加；已添加的生物可启用、停用或移除", 12, height - 42, 0xAAAAAA);
-        gg.drawString(font, "空名单时沿用默认敌对目标；配置后仅攻击已启用的生物", 12, height - 54, 0xAAAAAA);
+        gg.drawString(font, "未添加的生物沿用敌对/仇恨规则；名单只覆盖已配置的生物", 12, height - 54, 0xAAAAAA);
         List<MobEntry> entries = filteredEntries();
         gg.drawString(font, "生物类型: " + entries.size() + "    滚轮翻页", 12, 53, 0x888888);
         int panelWidth = Math.min(390, this.width - 20);
@@ -134,7 +134,7 @@ public class WardMobTargetsScreen extends Screen {
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             Boolean enabled = targets.get(entry.id());
-            String state = enabled == null ? "未添加" : (enabled ? "已启用" : "已停用");
+            String state = enabled == null ? "默认规则" : (enabled ? "强制允许" : "强制停用");
             String suffix = entry.installed() ? state : "未安装";
             String label = font.plainSubstrByWidth(entry.name() + " [" + entry.id() + "] · " + suffix,
                     panelWidth - 122);
