@@ -54,7 +54,7 @@ neoForge {
 
 dependencies {
     // ImGuiMC supplies the Minecraft renderer, input integration and native libraries.
-    implementation "foundry.imguimc:imguimc-neoforge-1.21.1:1.2.5"
+    compileOnly "foundry.imguimc:imguimc-neoforge-1.21.1:1.2.5"
     // Curios API —— 饰品栏支持（1.21.1 NeoForge）
     compileOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
