@@ -5,7 +5,6 @@ import imgui.ImGui;
 import imgui.ImGuiIO;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.type.ImBoolean;
-import imgui.type.ImFloat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -25,7 +24,7 @@ public final class ImGuiSettingsScreen extends Screen {
 
     private final Screen parent;
     private final ImBoolean demoToggle = new ImBoolean(true);
-    private final ImFloat demoSlider = new ImFloat(6.0f);
+    private final float[] demoSlider = {6.0f};
     private int selectedPage;
 
     public ImGuiSettingsScreen(Screen parent) {
@@ -53,12 +52,12 @@ public final class ImGuiSettingsScreen extends Screen {
         graphics.fill(0, 0, this.width, this.height, 0xD9090D16);
 
         ImGuiIO io = ImGui.getIO();
-        io.DisplaySize.x = this.width;
-        io.DisplaySize.y = this.height;
-        io.DisplayFramebufferScale.x = (float) minecraft.getWindow().getWidth() / Math.max(1, this.width);
-        io.DisplayFramebufferScale.y = (float) minecraft.getWindow().getHeight() / Math.max(1, this.height);
-        io.DeltaTime = 1.0f / 60.0f;
-        io.AddMousePosEvent(mouseX, mouseY);
+        io.setDisplaySize(this.width, this.height);
+        io.setDisplayFramebufferScale(
+                (float) minecraft.getWindow().getWidth() / Math.max(1, this.width),
+                (float) minecraft.getWindow().getHeight() / Math.max(1, this.height));
+        io.setDeltaTime(Math.max(0.001f, partialTick / 20.0f));
+        io.addMousePosEvent(mouseX, mouseY);
 
         ImGui.newFrame();
         drawWorkspace();
@@ -146,7 +145,7 @@ public final class ImGuiSettingsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        ImGui.getIO().AddMouseButtonEvent(button, true);
+        ImGui.getIO().addMouseButtonEvent(button, true);
         return true;
     }
 
@@ -158,13 +157,13 @@ public final class ImGuiSettingsScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        ImGui.getIO().AddMousePosEvent((float) mouseX, (float) mouseY);
+        ImGui.getIO().addMousePosEvent((float) mouseX, (float) mouseY);
         return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        ImGui.getIO().AddMouseWheelEvent((float) scrollX, (float) scrollY);
+        ImGui.getIO().addMouseWheelEvent((float) scrollX, (float) scrollY);
         return true;
     }
 
@@ -174,23 +173,17 @@ public final class ImGuiSettingsScreen extends Screen {
             onClose();
             return true;
         }
-        if (keyCode >= 0 && keyCode < ImGui.getIO().KeysDown.length) {
-            ImGui.getIO().KeysDown[keyCode] = true;
-        }
-        return true;
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
     public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        if (keyCode >= 0 && keyCode < ImGui.getIO().KeysDown.length) {
-            ImGui.getIO().KeysDown[keyCode] = false;
-        }
-        return true;
+        return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
-        ImGui.getIO().AddInputCharacter(codePoint);
+        ImGui.getIO().addInputCharacter((int) codePoint);
         return true;
     }
 
