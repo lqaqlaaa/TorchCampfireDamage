@@ -89,8 +89,8 @@ public final class WardEnchantmentsScreen extends Screen {
         panelLeft = (width - panelWidth) / 2;
         footerY = height - 24;
         boolean compact = panelWidth < 300;
-        listTop = compact ? 108 : 82;
-        statusY = compact ? 80 : 54;
+        listTop = compact ? 128 : 102;
+        statusY = compact ? 100 : 74;
         int availableHeight = Math.max(28, footerY - listTop - 8);
         rowsPerPage = Math.max(1, Math.min(6, availableHeight / 32));
         rowHeight = Math.max(28, Math.min(36, availableHeight / rowsPerPage));
