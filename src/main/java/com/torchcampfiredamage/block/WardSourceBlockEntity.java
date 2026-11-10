@@ -47,6 +47,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
     /** 本根火把启用的特殊伤害方式。 */
     private final java.util.Set<String> specialDamageTypes = new java.util.TreeSet<>();
+    private boolean forceOneHealth;
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -208,6 +209,9 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (changed) { setChanged(); sync(); }
     }
 
+    public boolean isForceOneHealth() { return forceOneHealth; }
+    public void setForceOneHealth(boolean enabled) { this.forceOneHealth = enabled; setChanged(); sync(); }
+
     public java.util.Set<String> getSpecialDamageTypes() {
         return java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(specialDamageTypes));
     }
@@ -258,7 +262,6 @@ public class WardSourceBlockEntity extends BlockEntity {
      */
     public void applyDefaults() {
         try {
-            var c = com.torchcampfiredamage.config.ModConfig.class;
             this.enabled = com.torchcampfiredamage.config.ModConfig.DEFAULT_ENABLED.get();
             this.chunkMode = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_MODE.get();
             this.chunkRadius = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_RADIUS.get();
@@ -431,6 +434,7 @@ public class WardSourceBlockEntity extends BlockEntity {
         net.minecraft.nbt.ListTag damageTypes = new net.minecraft.nbt.ListTag();
         for (String id : specialDamageTypes) damageTypes.add(net.minecraft.nbt.StringTag.valueOf(id));
         tag.put("specialDamageTypes", damageTypes);
+        tag.putBoolean("forceOneHealth", forceOneHealth);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -496,6 +500,7 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (id != null) discoveredMobTargets.put(id, item.getBoolean("Enabled"));
             }
         }
+        forceOneHealth = tag.getBoolean("forceOneHealth");
         specialDamageTypes.clear();
         if (tag.contains("specialDamageTypes", Tag.TAG_LIST)) {
             net.minecraft.nbt.ListTag types = tag.getList("specialDamageTypes", Tag.TAG_STRING);
