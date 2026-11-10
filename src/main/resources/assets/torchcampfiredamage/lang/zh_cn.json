@@ -1,5 +1,6 @@
 {
   "block.torchcampfiredamage.ward_torch": "守卫火把",
   "item.torchcampfiredamage.ward_torch": "守卫火把",
-  "item.torchcampfiredamage.ward_charm": "守卫护符"
+  "item.torchcampfiredamage.ward_charm": "守卫护符",
+  "key.torchcampfiredamage.open_settings": "打开模组设置"
 }
