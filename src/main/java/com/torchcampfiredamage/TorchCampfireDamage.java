@@ -68,6 +68,10 @@ public class TorchCampfireDamage {
                 WardMobTargetsPayload.TYPE,
                 WardMobTargetsPayload.CODEC,
                 WardMobTargetsPayload::handle);
+        registrar.playToServer(
+                com.torchcampfiredamage.network.WardEnchantmentsPayload.TYPE,
+                com.torchcampfiredamage.network.WardEnchantmentsPayload.CODEC,
+                com.torchcampfiredamage.network.WardEnchantmentsPayload::handle);
         // Dedicated servers also need to know the clientbound payload type.
         if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.DEDICATED_SERVER) {
             registrar.playToClient(
