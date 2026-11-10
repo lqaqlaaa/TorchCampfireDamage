@@ -17,29 +17,52 @@ public final class ImGuiSettingsScreen extends Screen {
     private static final ImBoolean DEMO_TOGGLE = new ImBoolean(true);
     private static final float[] DEMO_SLIDER = {6.0f};
     private static volatile ImGuiSettingsScreen activeScreen;
+    private static boolean firstDrawLogged;
+    private static boolean firstWindowResultLogged;
     private final Screen parent;
     private int selectedPage;
 
     public ImGuiSettingsScreen(Screen parent) {
         super(Component.literal("守卫火把"));
         this.parent = parent;
+        ClientDebugLog.info("ImGuiSettingsScreen constructed; parent="
+                + (parent == null ? "<none>" : parent.getClass().getName()));
     }
 
     @Override
     protected void init() {
         super.init();
         activeScreen = this;
+        firstDrawLogged = false;
+        firstWindowResultLogged = false;
+        ClientDebugLog.info("ImGuiSettingsScreen.init completed; guiSize=" + width + "x" + height
+                + ", activeScreenAssigned=true.");
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // ImGuiMC renders this screen from its post-frame event.
+        if (!firstDrawLogged) {
+            ClientDebugLog.info("Vanilla Screen.render callback reached; ImGuiMC event should draw on top.");
+        }
     }
 
     public static void renderActiveImGui() {
         ImGuiSettingsScreen screen = activeScreen;
-        if (screen == null || Minecraft.getInstance().screen != screen) {
+        if (screen == null) {
             return;
+        }
+        if (Minecraft.getInstance().screen != screen) {
+            if (!firstDrawLogged) {
+                ClientDebugLog.info("Active settings screen reference exists, but Minecraft.currentScreen differs: "
+                        + (Minecraft.getInstance().screen == null ? "<none>" : Minecraft.getInstance().screen.getClass().getName()));
+            }
+            return;
+        }
+        if (!firstDrawLogged) {
+            firstDrawLogged = true;
+            ClientDebugLog.info("ImGui draw callback reached active settings screen; dimensions="
+                    + screen.width + "x" + screen.height);
         }
         screen.drawWorkspace();
     }
@@ -51,7 +74,13 @@ public final class ImGuiSettingsScreen extends Screen {
         ImGui.setNextWindowSize(width, height, ImGuiCond.Once);
         int flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize
                 | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoSavedSettings;
-        if (ImGui.begin("守卫火把##workspace", flags)) {
+        boolean windowVisible = ImGui.begin("守卫火把##workspace", flags);
+        if (!firstWindowResultLogged) {
+            firstWindowResultLogged = true;
+            ClientDebugLog.info("ImGui.begin returned " + windowVisible + "; window size request="
+                    + width + "x" + height);
+        }
+        if (windowVisible) {
             ImGui.text("GUARD TORCH");
             ImGui.sameLine();
             ImGui.textDisabled("  /  CLIENT CONFIGURATION");
@@ -121,6 +150,7 @@ public final class ImGuiSettingsScreen extends Screen {
 
     @Override
     public void onClose() {
+        ClientDebugLog.info("ImGuiSettingsScreen.onClose called.");
         activeScreen = null;
         Minecraft.getInstance().setScreen(parent);
     }
@@ -130,6 +160,8 @@ public final class ImGuiSettingsScreen extends Screen {
         if (activeScreen == this) {
             activeScreen = null;
         }
+        ClientDebugLog.info("ImGuiSettingsScreen.removed called; active reference cleared="
+                + (activeScreen == null));
         super.removed();
     }
 
