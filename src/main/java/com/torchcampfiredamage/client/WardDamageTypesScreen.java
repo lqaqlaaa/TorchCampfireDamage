@@ -1,6 +1,6 @@
 package com.torchcampfiredamage.client;
 
-import com.torchcampfiredamage.network.WardEnchantmentsPayload;
+import com.torchcampfiredamage.network.WardDamageTypesPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -44,7 +44,7 @@ public final class WardDamageTypesScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal((selected.contains(id) ? "✓  " : "＋  ") + TYPES[i][1]), b -> {
                 boolean enable = !selected.contains(id);
                 if (enable) selected.add(id); else selected.remove(id);
-                PacketDistributor.sendToServer(new WardEnchantmentsPayload(pos, 2, id, enable ? 1 : 0));
+                PacketDistributor.sendToServer(new WardDamageTypesPayload(pos, 2, id, enable ? 1 : 0));
                 rebuildButtons();
             }).bounds(left, y, panelWidth, 22).build());
         }
