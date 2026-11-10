@@ -107,8 +107,13 @@ public class OffhandTorchHandler {
                 if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
                 // 与方块火把一致：跳过被命名的生物（白名单保护）
                 if (ignoreNamed && mob.hasCustomName()) continue;
-                if (!PlayerMobTargetsData.get(level.getServer()).isEnabled(sp.getUUID(), mob.getType())) continue;
-                if (!isHostile(mob)) continue;
+                // 显式名单只覆盖对应实体；名单外继续执行原有敌对/仇恨判定。
+                PlayerMobTargetsData mobTargets = PlayerMobTargetsData.get(level.getServer());
+                if (mobTargets.hasOverride(sp.getUUID(), mob.getType())) {
+                    if (!mobTargets.isEnabled(sp.getUUID(), mob.getType())) continue;
+                } else if (!isHostile(mob)) {
+                    continue;
+                }
 
                 if (glowing) mob.setGlowingTag(true);
                 if (slow) {
