@@ -108,6 +108,7 @@ public final class WardEnchantmentsScreen extends Screen {
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(graphics, this.width, this.height);
         super.render(graphics, mouseX, mouseY, partialTick);
         int panelWidth = Math.min(430, width - 16);
         int left = (width - panelWidth) / 2;
