@@ -48,6 +48,7 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_SLOW;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_DROPS;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_XP;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_IGNORE_NAMED_MOBS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -162,6 +163,7 @@ public class ModConfig {
         OFFHAND_SLOW = builder.comment("护符目标是否减速").define("slow", false);
         OFFHAND_TELEPORT_DROPS = builder.comment("护符击杀是否传送掉落物").define("teleportDrops", false);
         OFFHAND_TELEPORT_XP = builder.comment("护符击杀是否传送经验").define("teleportExperience", false);
+        OFFHAND_IGNORE_NAMED_MOBS = builder.comment("护符是否忽略已命名生物").define("ignoreNamedMobs", true);
 
         builder.pop();
 
