@@ -190,6 +190,7 @@ public class WardMobTargetsScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
         gg.drawCenteredString(font, "地下火把 · 攻击范围内的生物", width / 2, 10, 0xFFFFFF);
         gg.drawCenteredString(font, "敌对/仇恨生物默认开启，其他生物默认关闭；可单独切换",
