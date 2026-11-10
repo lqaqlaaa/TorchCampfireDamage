@@ -50,9 +50,9 @@ public class TorchCampfireDamage {
         registrar.playToServer(PlayerMobTargetsRequestPayload.TYPE, PlayerMobTargetsRequestPayload.CODEC,
                 PlayerMobTargetsRequestPayload::handle);
         registrar.playToServer(WardMobTargetsPayload.TYPE, WardMobTargetsPayload.CODEC, WardMobTargetsPayload::handle);
-        registrar.playToServer(com.torchcampfiredamage.network.WardEnchantmentsPayload.TYPE,
-                com.torchcampfiredamage.network.WardEnchantmentsPayload.CODEC,
-                com.torchcampfiredamage.network.WardEnchantmentsPayload::handle);
+        registrar.playToServer(com.torchcampfiredamage.network.WardDamageTypesPayload.TYPE,
+                com.torchcampfiredamage.network.WardDamageTypesPayload.CODEC,
+                com.torchcampfiredamage.network.WardDamageTypesPayload::handle);
 
         if (net.neoforged.fml.loading.FMLEnvironment.dist
                 == net.neoforged.api.distmarker.Dist.DEDICATED_SERVER) {
