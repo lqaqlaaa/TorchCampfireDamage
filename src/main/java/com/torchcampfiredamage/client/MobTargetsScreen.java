@@ -53,7 +53,7 @@ public final class MobTargetsScreen extends Screen {
     @Override
     protected void init() {
         current = this;
-        rowsPerPage = Math.max(1, Math.min(8, (height - 124) / 34));
+        rowsPerPage = Math.max(1, Math.min(7, (height - 132) / 44));
         visible = scanNearby();
         int pageCount = pageCount();
         if (page >= pageCount) page = pageCount - 1;
@@ -61,14 +61,14 @@ public final class MobTargetsScreen extends Screen {
 
         int start = page * rowsPerPage;
         int end = Math.min(visible.size(), start + rowsPerPage);
-        int rowHeight = 34;
+        int rowHeight = 44;
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
 
         for (int i = start; i < end; i++) {
             PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
-            int y = listTop + (i - start) * rowHeight + 10;
+            int y = listTop + (i - start) * rowHeight + 18;
             int right = left + listWidth;
             boolean configured = entry.configured();
             int toggleW = 54;
@@ -204,7 +204,7 @@ public final class MobTargetsScreen extends Screen {
         graphics.drawCenteredString(font, "第 " + (page + 1) + " / " + pageCount()
                 + " 页    当前范围内 " + visible.size() + " 种", width / 2, 36, 0xFFFFFF);
 
-        int rowHeight = 34;
+        int rowHeight = 44;
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
@@ -217,7 +217,7 @@ public final class MobTargetsScreen extends Screen {
         for (int i = start; i < end; i++) {
             PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
             int y = listTop + (i - start) * rowHeight;
-            graphics.fill(left, y + 10, left + listWidth, y + 34, 0x66333333);
+            graphics.fill(left, y + 17, left + listWidth, y + 42, 0x66333333);
             ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
             String name = id == null ? entry.entityId()
                     : BuiltInRegistries.ENTITY_TYPE.getOptional(id)
@@ -227,16 +227,16 @@ public final class MobTargetsScreen extends Screen {
             String namespace = id == null ? "unknown" : id.getNamespace();
             if (i == start || !namespace.equals(namespaceOf(visible.get(i - 1).entityId()))) {
                 String group = namespace.equals("minecraft") ? "Minecraft 原版" : namespace;
-                graphics.fill(left, y - 10, left + listWidth, y - 9, 0xFF777777);
-                graphics.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
+                graphics.fill(left, y + 13, left + listWidth, y + 14, 0xFF777777);
+                graphics.drawString(font, group, left + 4, y + 3, 0xFFFFD700);
             }
             // 预览区域严格限制在本行内；巨型实体即使模型超出默认尺寸，也不会覆盖相邻条目。
-            graphics.enableScissor(left + 2, y + 8, left + 34, y + 34);
-            renderPreview(graphics, id, left + 18, y + 22);
+            graphics.enableScissor(left + 4, y + 16, left + 32, y + 42);
+            renderPreview(graphics, id, left + 18, y + 38);
             graphics.disableScissor();
             graphics.drawString(font, font.plainSubstrByWidth(name + " · " + state, listWidth - 154),
-                    left + 38, y + 14, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
-            graphics.drawString(font, entry.entityId(), left + 38, y + 23, 0x888888);
+                    left + 38, y + 23, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
+            graphics.drawString(font, entry.entityId(), left + 38, y + 33, 0x888888);
         }
     }
 
@@ -273,7 +273,7 @@ public final class MobTargetsScreen extends Screen {
             try {
                 preview.setNoAi(true);
                 InventoryScreen.renderEntityInInventoryFollowsAngle(
-                        graphics, x - 10, y - 22, x + 10, y + 2, 18, 0.0F, 0.0F, 0.0F, preview);
+                        graphics, x - 9, y - 9, x + 9, y + 9, 12, 0.0F, 0.0F, 0.0F, preview);
             } catch (Throwable ignored) { }
         }
     }
