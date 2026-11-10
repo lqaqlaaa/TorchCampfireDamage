@@ -76,7 +76,7 @@ public class WardConfigScreen extends Screen {
         int left = cx - 160;
         int right = cx + 10;
         // 内容总高约 6 行 + 2 行按钮
-        int contentH = ROW_H * 6 + 60;
+        int contentH = ROW_H * 7 + 60;
         int top = Math.max(8, (this.height - contentH) / 2);
         int y = top;
 
@@ -171,12 +171,19 @@ public class WardConfigScreen extends Screen {
                 .build());
         ry += ROW_H;
 
+        addRenderableWidget(Button.builder(Component.literal("攻击附魔"), b ->
+                Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments())))
+                .bounds(right, ry, BTN_W, 20)
+                .tooltip(Tooltip.create(Component.literal("为当前这根放置火把配置独立攻击附魔；可添加多种附魔并设置等级")))
+                .build());
+        ry += ROW_H;
+
         // ---- 底部按钮区（两行三列，居中）----
         int bw = 88;      // 按钮宽
         int gap = 6;      // 间距
         int totalW = bw * 3 + gap * 2;
         int bx0 = cx - totalW / 2;
-        int by1 = top + ROW_H * 6 + 16;
+        int by1 = top + ROW_H * 7 + 16;
         int by2 = by1 + 24;
 
         // 第一行：显示范围 / 显示设置 / 保存
