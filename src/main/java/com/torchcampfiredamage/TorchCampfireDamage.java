@@ -9,6 +9,7 @@ import com.torchcampfiredamage.events.PlayerMobTargetHandler;
 import com.torchcampfiredamage.network.UpdateWardPayload;
 import com.torchcampfiredamage.network.UpdateOrbitPayload;
 import com.torchcampfiredamage.network.PlayerMobTargetsRequestPayload;
+import com.torchcampfiredamage.network.WardMobTargetsPayload;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -65,6 +66,10 @@ public class TorchCampfireDamage {
                 PlayerMobTargetsRequestPayload.TYPE,
                 PlayerMobTargetsRequestPayload.CODEC,
                 PlayerMobTargetsRequestPayload::handle);
+        registrar.playToServer(
+                WardMobTargetsPayload.TYPE,
+                WardMobTargetsPayload.CODEC,
+                WardMobTargetsPayload::handle);
         // Dedicated servers also need to know the clientbound payload type.
         if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.DEDICATED_SERVER) {
             registrar.playToClient(
