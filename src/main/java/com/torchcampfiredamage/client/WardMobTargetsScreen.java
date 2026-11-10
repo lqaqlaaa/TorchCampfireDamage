@@ -37,6 +37,8 @@ public class WardMobTargetsScreen extends Screen {
     private int scroll;
     private final List<Button> rowButtons = new ArrayList<>();
     private final Map<ResourceLocation, Mob> previews = new HashMap<>();
+    private final Map<ResourceLocation, Mob> nearbyMobs = new TreeMap<>();
+    private boolean nearbyScanned = false;
 
     private record MobEntry(ResourceLocation id, String name, boolean enabled, boolean configured) {}
 
@@ -66,22 +68,26 @@ public class WardMobTargetsScreen extends Screen {
             area = AABB.ofSize(Vec3.atCenterOf(pos), r*2, y*2, r*2);
         }
 
-        Map<ResourceLocation, Mob> nearby = new TreeMap<>();
-        for (Mob mob : mc.level.getEntitiesOfClass(Mob.class, area)) {
-            if (!mob.isAlive()) continue;
-            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
-            if (id != null) {
-                nearby.putIfAbsent(id, mob);
-                PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 3, id.toString(), isHostile(mob)));
+        // 该界面每帧都会渲染；实体扫描和网络发现上报只能在缓存失效时执行，
+        // 不能放在每帧调用的 filteredEntries() 热路径中。
+        if (!nearbyScanned) {
+            nearbyMobs.clear();
+            for (Mob mob : mc.level.getEntitiesOfClass(Mob.class, area)) {
+                if (!mob.isAlive()) continue;
+                ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+                if (id != null && nearbyMobs.putIfAbsent(id, mob) == null) {
+                    PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 3, id.toString(), isHostile(mob)));
+                }
             }
+            nearbyScanned = true;
         }
 
         String q = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
         List<MobEntry> result = new ArrayList<>();
         Map<ResourceLocation, Boolean> allIds = new TreeMap<>(ward.getDiscoveredMobTargetDefaults());
-        for (ResourceLocation id : nearby.keySet()) allIds.put(id, isHostile(nearby.get(id)));
+        for (ResourceLocation id : nearbyMobs.keySet()) allIds.put(id, isHostile(nearbyMobs.get(id)));
         for (ResourceLocation id : allIds.keySet()) {
-            Mob mob = nearby.get(id);
+            Mob mob = nearbyMobs.get(id);
             boolean configured = targets.containsKey(id);
             boolean defaultEnabled = allIds.getOrDefault(id, false);
             boolean enabled = configured ? targets.get(id) : defaultEnabled;
@@ -122,6 +128,7 @@ public class WardMobTargetsScreen extends Screen {
         rebuildRows();
         addRenderableWidget(Button.builder(Component.literal("刷新"), b -> {
             scroll = 0;
+            nearbyScanned = false;
             rebuildRows();
         }).bounds(this.width / 2 - 88, this.height - 28, 56, 20).build());
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
