@@ -298,7 +298,7 @@ public class DamageEventHandler {
                         false, false, true));
             }
 
-            if (damage <= 0) {
+            if (damage <= 0 && !ward.isForceOneHealth()) {
                 damagedThisTick.add(mob.getUUID());
                 continue;
             }
