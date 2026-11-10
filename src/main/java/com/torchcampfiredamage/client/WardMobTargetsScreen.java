@@ -237,19 +237,28 @@ public class WardMobTargetsScreen extends Screen {
             catch (Throwable ignored) { return null; }
         });
         if (preview == null) return;
-        int boxW = 116, boxH = 126;
+        // Size the hover panel and entity render scale from the actual mob bounds.
+        // The enlarged preview deliberately has no scissor: only the tiny row icon is clipped.
+        float entityW = Math.max(0.25F, preview.getBbWidth());
+        float entityH = Math.max(0.25F, preview.getBbHeight());
+        int maxW = Math.max(96, Math.min(300, width - 8));
+        int maxH = Math.max(96, Math.min(300, height - 44));
+        float scale = Math.min(48.0F, Math.min((maxW - 24) / (entityW * 2.2F),
+                (maxH - 38) / (entityH * 2.2F)));
+        scale = Math.max(1.0F, scale);
+        int boxW = Math.min(maxW, Math.max(116, (int)(entityW * scale * 2.2F) + 24));
+        int boxH = Math.min(maxH, Math.max(126, (int)(entityH * scale * 2.2F) + 38));
         int x = Math.max(4, Math.min(width - boxW - 4, mouseX + 14));
         int y = Math.max(36, Math.min(height - boxH - 4, mouseY + 12));
-        graphics.fill(x, y, x + boxW, y + boxH, 0xF0101010);
-        graphics.renderOutline(x, y, boxW, boxH, 0xFFFFD700);
-        graphics.drawCenteredString(font, font.plainSubstrByWidth(entry.name(), boxW - 8), x + boxW / 2, y + 6, 0xFFFFFF);
-        graphics.enableScissor(x + 4, y + 24, x + boxW - 4, y + boxH - 4);
+        graphics.fill(x, y, x + boxW, y + boxH, 0xF0101724);
+        graphics.fill(x, y, x + boxW, y + 2, 0xFF398BFF);
+        graphics.renderOutline(x, y, boxW, boxH, 0xFF42658E);
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(entry.name(), boxW - 12), x + boxW / 2, y + 7, 0xFFFFFFFF);
         try {
             preview.setNoAi(true);
-            InventoryScreen.renderEntityInInventoryFollowsAngle(graphics, x + 8, y + 22, x + boxW - 8,
-                    y + boxH - 4, 48, 0.0F, 0.0F, 0.0F, preview);
+            InventoryScreen.renderEntityInInventoryFollowsAngle(graphics, x + 8, y + 24,
+                    x + boxW - 8, y + boxH - 8, scale, 0.0F, 0.0F, 0.0F, preview);
         } catch (Throwable ignored) { }
-        graphics.disableScissor();
     }
 
 
