@@ -59,7 +59,7 @@ public class GlobalSettingsScreen extends Screen {
 
     private List<Row> visibleRows() {
         int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 21;
-        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 21 : allRows.size();
+        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 22 : allRows.size();
         return allRows.subList(Math.min(from, allRows.size()), Math.min(to, allRows.size()));
     }
 
@@ -121,6 +121,8 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.OFFHAND_TELEPORT_XP.get(), v -> ModConfig.OFFHAND_TELEPORT_XP.set(v)));
         allRows.add(boolRow("护符忽略命名生物", "护符不会攻击带有自定义名称的生物",
                 () -> ModConfig.OFFHAND_IGNORE_NAMED_MOBS.get(), v -> ModConfig.OFFHAND_IGNORE_NAMED_MOBS.set(v)));
+        allRows.add(boolRow("护符强制一滴血", "先将目标压至 1 HP，再使用玩家伤害来源完成击杀；优先于特殊伤害类型",
+                () -> ModConfig.OFFHAND_FORCE_ONE_HEALTH.get(), v -> ModConfig.OFFHAND_FORCE_ONE_HEALTH.set(v)));
 
         // --- 新火把默认值 ---
         allRows.add(boolRow("默认启用", "新放置的火把是否默认开启",
