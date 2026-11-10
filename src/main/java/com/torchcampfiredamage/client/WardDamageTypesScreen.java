@@ -26,7 +26,7 @@ public final class WardDamageTypesScreen extends Screen {
     };
 
     public WardDamageTypesScreen(Screen parent, BlockPos pos, Set<String> current) {
-        super(Component.literal("守卫火把 · 特殊伤害"));
+        super(Component.literal("守卫火把 · 伤害方法"));
         this.parent = parent;
         this.pos = pos;
         if (current != null) selected.addAll(current);
@@ -38,6 +38,12 @@ public final class WardDamageTypesScreen extends Screen {
         int left = (width - panelWidth) / 2;
         int top = Math.max(38, (height - 260) / 2);
         int rowHeight = Math.max(40, Math.min(48, (height - top - 48) / TYPES.length));
+        addRenderableWidget(Button.builder(Component.literal("强制一滴血：单独伤害方法"), b -> {
+            boolean enable = !selected.contains("one_hit");
+            if (enable) selected.add("one_hit"); else selected.remove("one_hit");
+            PacketDistributor.sendToServer(new WardDamageTypesPayload(pos, 3, "one_hit", enable ? 1 : 0));
+            b.setMessage(Component.literal("强制一滴血：" + (enable ? "开启" : "关闭")));
+        }).bounds(left, Math.max(8, top - 26), panelWidth, 20).build());
         for (int i = 0; i < TYPES.length; i++) {
             final String id = TYPES[i][0];
             int y = top + i * rowHeight;
@@ -61,7 +67,7 @@ public final class WardDamageTypesScreen extends Screen {
         renderBackground(g, mouseX, mouseY, partialTick);
         GuiLayout.drawFrame(g, width, height);
         super.render(g, mouseX, mouseY, partialTick);
-        g.drawCenteredString(font, "特殊伤害方式（可多选）", width / 2, 14, GuiLayout.TEXT);
+        g.drawCenteredString(font, "独立伤害方法与特殊伤害类型", width / 2, 14, GuiLayout.TEXT);
         int panelWidth = Math.min(440, width - 20);
         int left = (width - panelWidth) / 2;
         int top = Math.max(38, (height - 260) / 2);
