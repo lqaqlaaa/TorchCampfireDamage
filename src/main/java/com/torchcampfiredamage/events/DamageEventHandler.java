@@ -318,7 +318,12 @@ public class DamageEventHandler {
 
     private static ItemStack buildEnchantmentSource(ServerLevel level, WardSourceBlockEntity ward, Player owner) {
         if (ward.getAttackEnchantments().isEmpty()) return ItemStack.EMPTY;
-        // Use the owner's actual weapon item as the enchantment carrier. Some modded enchantments\n        // validate supported item tags during effect evaluation; a synthetic diamond sword\n        // silently disables enchantments that are valid on the player's real weapon.\n        ItemStack source = owner != null && !owner.getMainHandItem().isEmpty()\n                ? owner.getMainHandItem().copyWithCount(1)\n                : new ItemStack(Items.DIAMOND_SWORD);
+        // Use the owner's actual weapon item as the enchantment carrier. Some modded enchantments
+        // validate supported item tags during effect evaluation; a synthetic diamond sword
+        // silently disables enchantments that are valid on the player's real weapon.
+        ItemStack source = owner != null && !owner.getMainHandItem().isEmpty()
+                ? owner.getMainHandItem().copyWithCount(1)
+                : new ItemStack(Items.DIAMOND_SWORD);
         ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
         var registry = level.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
         for (var entry : ward.getAttackEnchantments().entrySet()) {
