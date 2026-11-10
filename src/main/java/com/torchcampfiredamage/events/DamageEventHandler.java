@@ -410,7 +410,7 @@ public class DamageEventHandler {
         }
     }
 
-    /** 供副手火把等外部逻辑登记掉落物/经验传送目标 */
+    /** 供 Curios 护符等外部攻击源登记掉落物/经验传送目标 */
     public static void putDropTarget(UUID entityId, net.minecraft.core.BlockPos pos,
                                      boolean drops, boolean xp) {
         if (drops || xp) {
