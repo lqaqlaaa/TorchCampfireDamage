@@ -54,7 +54,7 @@ public class GlobalSettingsScreen extends Screen {
     private final List<Row> allRows = new ArrayList<>();
     private int page = 0;
     private int pageCount = 1;
-    // 0 = 真正全局规则，1 = 副手火把，2 = 新放置火把默认值
+    // 0 = 全局规则，1 = Curios 护符，2 = 新放置火把默认值
     private int activeCategory = 0;
 
     private List<Row> visibleRows() {
@@ -81,7 +81,7 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.TELEPORT_XP.get(), v -> ModConfig.TELEPORT_XP.set(v)));
         allRows.add(boolRow("算玩家击杀", "伤害归属于玩家（有击杀数、掉落正常）",
                 () -> ModConfig.COUNT_AS_PLAYER_KILL.get(), v -> ModConfig.COUNT_AS_PLAYER_KILL.set(v)));
-        allRows.add(boolRow("忽略命名生物", "已命名的生物不会被伤害（白名单），副手火把同样生效",
+        allRows.add(boolRow("忽略命名生物", "已命名的生物不会被伤害（白名单），Curios 护符同样生效",
                 () -> ModConfig.IGNORE_NAMED_MOBS.get(), v -> ModConfig.IGNORE_NAMED_MOBS.set(v)));
         allRows.add(boolRow("被激怒算敌对", "被激怒的中立生物也视作敌对",
                 () -> ModConfig.TREAT_PROVOKED_AS_HOSTILE.get(), v -> ModConfig.TREAT_PROVOKED_AS_HOSTILE.set(v)));
@@ -98,7 +98,7 @@ public class GlobalSettingsScreen extends Screen {
         allRows.add(intRow("减速持续", "减速效果持续 tick，20 = 1 秒",
                 () -> ModConfig.SLOW_DURATION.get(), v -> ModConfig.SLOW_DURATION.set(v)));
 
-        // --- 副手火把 ---
+        // --- Curios 护符 ---
         allRows.add(boolRow("启用护符", "Curios 饰品栏装备护符时是否生效",
                 () -> ModConfig.OFFHAND_ENABLED.get(), v -> ModConfig.OFFHAND_ENABLED.set(v)));
         allRows.add(intRow("护符区块半径", "伤害范围（区块），1 = 3x3 区块",
@@ -109,15 +109,15 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.set(v)));
         allRows.add(dblRow("护符固定伤害", "仅固定伤害模式生效，2.0 = 1 颗心",
                 () -> ModConfig.OFFHAND_FIXED_DAMAGE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE.set(Math.max(0.0, Math.min(2048.0, v)))));
-        allRows.add(boolRow("护符击杀播报", "副手击杀时是否播报",
+        allRows.add(boolRow("护符击杀播报", "护符击杀时是否播报",
                 () -> ModConfig.OFFHAND_ANNOUNCE.get(), v -> ModConfig.OFFHAND_ANNOUNCE.set(v)));
         allRows.add(boolRow("护符发光", "被攻击目标获得发光效果",
                 () -> ModConfig.OFFHAND_GLOWING.get(), v -> ModConfig.OFFHAND_GLOWING.set(v)));
         allRows.add(boolRow("护符减速", "被攻击目标获得减速效果",
                 () -> ModConfig.OFFHAND_SLOW.get(), v -> ModConfig.OFFHAND_SLOW.set(v)));
-        allRows.add(boolRow("护符传掉落", "副手击杀掉落物传送到玩家",
+        allRows.add(boolRow("护符传掉落", "护符击杀掉落物传送到玩家",
                 () -> ModConfig.OFFHAND_TELEPORT_DROPS.get(), v -> ModConfig.OFFHAND_TELEPORT_DROPS.set(v)));
-        allRows.add(boolRow("护符传经验", "副手击杀经验球传送到玩家",
+        allRows.add(boolRow("护符传经验", "护符击杀经验球传送到玩家",
                 () -> ModConfig.OFFHAND_TELEPORT_XP.get(), v -> ModConfig.OFFHAND_TELEPORT_XP.set(v)));
 
         // --- 新火把默认值 ---
