@@ -6,6 +6,7 @@ import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,7 +47,7 @@ import java.util.*;
  *  - CONSUMED 计数，两个事件都处理完才移除标记
  */
 public class DamageEventHandler {
-    private static final int SCAN_STEP = 2;
+    private static final int SCAN_STEP = 5;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
     private static final int CLEAN_PERIOD = 20;
 
@@ -63,6 +64,7 @@ public class DamageEventHandler {
     private static boolean DEBUG_PRINTED = false;
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
+    private record WardRegion(BlockPos pos, WardSourceBlockEntity ward, AABB area) {}
 
     /* ================= 登记 ================= */
 
@@ -70,7 +72,7 @@ public class DamageEventHandler {
         if (level.isClientSide()) return;
         Set<BlockPos> set = REGISTERED.get(level);
         if (set == null) {
-            set = new HashSet<>();
+            set = new LinkedHashSet<>();
             REGISTERED.put(level, set);
         }
         if (set.add(pos)) TOTAL_REGISTERED++;
@@ -164,8 +166,6 @@ public class DamageEventHandler {
         Set<BlockPos> torches = REGISTERED.get(level);
         if (torches == null || torches.isEmpty()) return;
 
-        if (gameTime % SCAN_STEP != 0) return;
-
         if (!DEBUG_PRINTED) {
             DEBUG_PRINTED = true;
             TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] indexed tick active, torches=" + torches.size());
@@ -175,16 +175,32 @@ public class DamageEventHandler {
         Map<BlockPos, UUID> owners = positionOwners.computeIfAbsent(level, k -> new HashMap<>());
 
         Set<UUID> damagedThisTick = new HashSet<>();
+        // 先复制登记集合，再按持久化放置序号建立优先级区域表。
         List<BlockPos> snapshot = new ArrayList<>(torches);
+        List<WardRegion> orderedRegions = new ArrayList<>(snapshot.size());
+        Map<BlockPos, WardSourceBlockEntity> activeWards = new HashMap<>();
+        for (BlockPos pos : snapshot) {
+            BlockEntity entity = level.getBlockEntity(pos);
+            if (entity instanceof WardSourceBlockEntity ward) {
+                activeWards.put(pos, ward);
+                if (ward.isEnabled()) orderedRegions.add(new WardRegion(pos, ward, damageArea(pos, ward)));
+            }
+        }
+        // 使用写入方块实体 NBT 的放置序号，而不是区块加载顺序或 HashSet 顺序。
+        orderedRegions.sort(Comparator
+                .comparingLong((WardRegion region) -> region.ward().getPlacementOrder())
+                .thenComparing(region -> region.pos()));
         List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
-            BlockEntity be = level.getBlockEntity(ip);
-            if (!(be instanceof WardSourceBlockEntity ward)) {
+            WardSourceBlockEntity ward = activeWards.get(ip);
+            if (ward == null) {
                 unregister(level, ip);
                 continue;
             }
             if (!ward.isEnabled()) continue;
+            // 将不同位置的火把分散到不同 tick 扫描，避免大量火把在同一 tick 集中查询大范围实体。
+            if (Math.floorMod(gameTime + ip.hashCode(), SCAN_STEP) != 0) continue;
 
             Player nearest = null;
             double nearestSq = Double.MAX_VALUE;
@@ -207,15 +223,32 @@ public class DamageEventHandler {
             long last = damageTimes.getOrDefault(ip, Long.MIN_VALUE / 2);
             if (gameTime - last < interval) continue;
 
-            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick, gameTime);
+            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick, gameTime, orderedRegions);
             damageTimes.put(ip, gameTime);
         }
+    }
+
+
+    private static boolean claimedByEarlierTorch(BlockPos current, Mob mob, List<WardRegion> orderedRegions) {
+        for (WardRegion region : orderedRegions) {
+            if (region.pos().equals(current)) return false;
+            WardSourceBlockEntity earlier = region.ward();
+            if (!region.area().contains(mob.position())) continue;
+            if (earlier.isIgnoreNamed() && mob.hasCustomName()) continue;
+            if (earlier.hasMobTargetOverride(mob.getType())) {
+                if (!earlier.isMobTargetAllowed(mob.getType())) continue;
+            } else if (!isHostileToPlayers(mob)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /* ================= 伤害 ================= */
 
     private static void damageHostiles(ServerLevel level, BlockPos center, WardSourceBlockEntity ward,
-                                       UUID ownerUUID, Set<UUID> damagedThisTick, long gameTime) {
+                                       UUID ownerUUID, Set<UUID> damagedThisTick, long gameTime, List<WardRegion> orderedRegions) {
         AABB area = damageArea(center, ward);
         Player owner = ownerUUID == null ? null : level.getPlayerByUUID(ownerUUID);
 
@@ -230,34 +263,28 @@ public class DamageEventHandler {
         // 命名生物白名单：优先使用本火把自己的设置（右键界面可单独调整）
         boolean ignoreNamed = ward.isIgnoreNamed();
 
-        // 大范围保护：AABB 过大时改用「按区块分段查询」，避免单次查询扫描过多 section
-        java.util.List<Mob> candidates;
-        double areaX = area.maxX - area.minX;
-        double areaZ = area.maxZ - area.minZ;
-        if (areaX * areaZ > 256.0 * 256.0) {
-            // 超过 256x256 时，以火把为中心按半径分段查询（每段 128 格）
-            candidates = new ArrayList<>();
-            double halfX = areaX / 2.0;
-            double halfZ = areaZ / 2.0;
-            double step = 128.0;
-            for (double ox = -halfX; ox < halfX; ox += step) {
-                for (double oz = -halfZ; oz < halfZ; oz += step) {
-                    AABB sub = new AABB(
-                            area.minX + ox, area.minY, area.minZ + oz,
-                            Math.min(area.minX + ox + step, area.maxX),
-                            area.maxY,
-                            Math.min(area.minZ + oz + step, area.maxZ));
-                    candidates.addAll(level.getEntitiesOfClass(Mob.class, sub));
-                }
-            }
-        } else {
-            candidates = level.getEntitiesOfClass(Mob.class, area);
-        }
+        // Minecraft 的实体查询本身会利用实体区块分区；把大 AABB 切成许多小 AABB
+        // 会重复访问相邻区域、创建大量列表并合并结果。一次查询即可避免这些额外开销。
+        java.util.List<Mob> candidates = level.getEntitiesOfClass(Mob.class, area);
 
         for (Mob mob : candidates) {
-            if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
+            if (!mob.isAlive()) continue;
+            // 生物发现记录属于服务端范围扫描，不依赖玩家打开名单界面；
+            // 必须在命名保护、目标过滤和造成伤害之前记录，避免低血量生物被瞬间击杀后漏记。
+            ResourceLocation discoveredId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+            if (discoveredId != null) ward.discoverMobTarget(discoveredId, isHostileToPlayers(mob));
+            if (damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
-            if (!isHostileToPlayers(mob)) continue;
+            // 重叠区域归属：按服务端登记顺序检查更早的火把。
+            // 更早火把禁用、卸载、名单排除此生物或不在范围内时，不占用归属，后续火把可接管。
+            if (claimedByEarlierTorch(center, mob, orderedRegions)) continue;
+            // 只有明确添加到本火把名单中的类型才覆盖默认行为。
+            // 未配置的生物继续使用旧版敌对/仇恨判定，避免添加一个目标后误伤默认规则。
+            if (ward.hasMobTargetOverride(mob.getType())) {
+                if (!ward.isMobTargetAllowed(mob.getType())) continue;
+            } else if (!isHostileToPlayers(mob)) {
+                continue;
+            }
 
             if (glowing) {
                 mob.setGlowingTag(true);
@@ -271,7 +298,7 @@ public class DamageEventHandler {
                         false, false, true));
             }
 
-            if (damage <= 0) {
+            if (damage <= 0 && !ward.isForceOneHealth()) {
                 damagedThisTick.add(mob.getUUID());
                 continue;
             }
@@ -287,13 +314,29 @@ public class DamageEventHandler {
                 pendingCleanup.put(id, gameTime);
             }
 
-            boolean hurtOk = mob.hurt(src, damage);
-            if (!hurtOk) {
+            // 独立伤害方法优先执行：先压至半颗心，再交由玩家伤害来源完成死亡判定。
+            if (ward.isForceOneHealth()) {
+                float originalHealth = mob.getHealth();
+                mob.setHealth(1.0F);
                 mob.invulnerableTime = 0;
-                float nh = mob.getHealth() - damage;
-                mob.setHealth(Math.max(0.0f, nh));
-                if (mob.getHealth() <= 0.0f) {
-                    mob.die(src);
+                boolean killed = mob.hurt(src, Math.max(1.0F, damage));
+                if (!killed && mob.isAlive()) {
+                    // 伤害被取消或拒绝时回滚，避免目标无故永久只剩 1 HP。
+                    mob.setHealth(originalHealth);
+                }
+            }
+
+            // 独立方法执行后，再处理所有选中的特殊伤害类型。
+            // 目标若已死亡，后续 hurt 无法继续命中；持续燃烧也只对存活目标施加。
+            if (mob.isAlive()) {
+                java.util.List<DamageSource> sources = buildDamageSources(level, ward);
+                if (ward.getSpecialDamageTypes().contains("burn")) {
+                    mob.setRemainingFireTicks(Math.max(mob.getRemainingFireTicks(), 100));
+                }
+                for (DamageSource source : sources) {
+                    if (!mob.isAlive()) break;
+                    mob.invulnerableTime = 0;
+                    mob.hurt(source, damage);
                 }
             }
 
@@ -304,12 +347,26 @@ public class DamageEventHandler {
                     announceKill(level, center, mob);
                 }
             } else {
-                UUID id = mob.getUUID();
-                entityDropTargets.remove(id);
-                CONSUMED.remove(id);
-                pendingCleanup.remove(id);
+                // 伤害没有在本次调用中击杀目标时，立即撤销掉落归属。
+                // 否则玩家或其他伤害来源在清理窗口内击杀它，会错误地把掉落传送到火把。
+                entityDropTargets.remove(mob.getUUID());
+                CONSUMED.remove(mob.getUUID());
+                pendingCleanup.remove(mob.getUUID());
             }
         }
+    }
+
+
+    private static java.util.List<DamageSource> buildDamageSources(ServerLevel level, WardSourceBlockEntity ward) {
+        java.util.Set<String> selected = ward.getSpecialDamageTypes();
+        java.util.List<DamageSource> sources = new java.util.ArrayList<>();
+        if (selected.isEmpty()) return java.util.List.of(level.damageSources().magic());
+        if (selected.contains("fire")) sources.add(level.damageSources().inFire());
+        if (selected.contains("burn")) sources.add(level.damageSources().onFire());
+        if (selected.contains("magic")) sources.add(level.damageSources().magic());
+        if (selected.contains("lightning")) sources.add(level.damageSources().lightningBolt());
+        if (selected.contains("wither")) sources.add(level.damageSources().wither());
+        return sources.isEmpty() ? java.util.List.of(level.damageSources().magic()) : sources;
     }
 
     /* ================= 清理 ================= */
@@ -344,7 +401,7 @@ public class DamageEventHandler {
         }
     }
 
-    /** 供副手火把等外部逻辑登记掉落物/经验传送目标 */
+    /** 供 Curios 护符等外部攻击源登记掉落物/经验传送目标 */
     public static void putDropTarget(UUID entityId, net.minecraft.core.BlockPos pos,
                                      boolean drops, boolean xp) {
         if (drops || xp) {

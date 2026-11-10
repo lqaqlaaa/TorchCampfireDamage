@@ -37,15 +37,19 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> DEFAULT_TELEPORT_DROPS;
     public static final ModConfigSpec.ConfigValue<Boolean> DEFAULT_TELEPORT_XP;
 
-    /* ===== 副手火把 ===== */
+    /* ===== Curios 护符（保留 OFFHAND 配置键以兼容旧配置文件） ===== */
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_ENABLED;
     public static final ModConfigSpec.ConfigValue<Integer> OFFHAND_CHUNK_RADIUS;
     public static final ModConfigSpec.ConfigValue<Integer> OFFHAND_INTERVAL;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_FIXED_DAMAGE_MODE;
+    public static final ModConfigSpec.ConfigValue<Double> OFFHAND_FIXED_DAMAGE;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_ANNOUNCE;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_GLOWING;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_SLOW;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_DROPS;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_TELEPORT_XP;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_IGNORE_NAMED_MOBS;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_FORCE_ONE_HEALTH;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -132,26 +136,36 @@ public class ModConfig {
         builder.pop();
 
         /* ================= 副手火把 ================= */
-        builder.comment("副手持守卫火把时的效果")
+        builder.comment("Curios 饰品栏装备守卫护符时的玩家级效果（offhand 配置段为兼容旧版本保留）")
                 .push("offhand");
 
         OFFHAND_ENABLED = builder
-                .comment("启用副手火把效果")
+                .comment("启用 Curios 守卫护符效果")
                 .define("enabled", true);
 
         OFFHAND_CHUNK_RADIUS = builder
-                .comment("副手火把的区块半径（1 = 3x3 区块）")
+                .comment("护符攻击范围的区块半径（1 = 3x3 区块）")
                 .defineInRange("chunkRadius", 1, 0, 32);
 
         OFFHAND_INTERVAL = builder
-                .comment("副手火把的伤害间隔（tick，1 = 每 tick，建议 5~10 降低卡顿）")
+                .comment("护符攻击间隔（tick，建议 5~10 降低卡顿）")
                 .defineInRange("interval", 5, 1, Integer.MAX_VALUE);
 
-        OFFHAND_ANNOUNCE = builder.comment("副手火把是否播报").define("announce", false);
-        OFFHAND_GLOWING = builder.comment("副手火把是否发光").define("glowing", false);
-        OFFHAND_SLOW = builder.comment("副手火把是否减速").define("slow", false);
-        OFFHAND_TELEPORT_DROPS = builder.comment("副手火把是否传送掉落物").define("teleportDrops", false);
-        OFFHAND_TELEPORT_XP = builder.comment("副手火把是否传送经验").define("teleportExperience", false);
+        OFFHAND_FIXED_DAMAGE_MODE = builder
+                .comment("护符伤害模式：false = 玩家攻击力，true = 固定伤害")
+                .define("fixedDamageMode", false);
+
+        OFFHAND_FIXED_DAMAGE = builder
+                .comment("护符固定伤害（2.0 = 1颗心）")
+                .defineInRange("fixedDamage", 2.0, 0.0, 2048.0);
+
+        OFFHAND_ANNOUNCE = builder.comment("护符击杀是否播报").define("announce", false);
+        OFFHAND_GLOWING = builder.comment("护符目标是否发光").define("glowing", false);
+        OFFHAND_SLOW = builder.comment("护符目标是否减速").define("slow", false);
+        OFFHAND_TELEPORT_DROPS = builder.comment("护符击杀是否传送掉落物").define("teleportDrops", false);
+        OFFHAND_TELEPORT_XP = builder.comment("护符击杀是否传送经验").define("teleportExperience", false);
+        OFFHAND_IGNORE_NAMED_MOBS = builder.comment("护符是否忽略已命名生物").define("ignoreNamedMobs", true);
+        OFFHAND_FORCE_ONE_HEALTH = builder.comment("护符攻击前是否将目标生命值压至 1 HP，再使用玩家伤害来源攻击").define("forceOneHealth", false);
 
         builder.pop();
 

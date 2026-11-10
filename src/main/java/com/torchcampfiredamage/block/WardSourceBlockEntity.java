@@ -21,6 +21,11 @@ import com.torchcampfiredamage.events.DamageEventHandler;
  */
 public class WardSourceBlockEntity extends BlockEntity {
 
+    private static long nextPlacementSequence;
+    /** 持久化的放置顺序，用于重叠攻击区域的稳定优先级。 */
+    private long placementOrder;
+    private long lastDiscoverySync = Long.MIN_VALUE;
+
     private boolean enabled = true;
     /** true = 区块模式, false = 方块模式 */
     private boolean chunkMode = true;
@@ -36,6 +41,13 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean teleportXp = true;
     /** 是否忽略被命名的生物（白名单保护），本火把独立开关 */
     private boolean ignoreNamed = true;
+    /** 本方块独立的攻击生物名单；空名单表示沿用默认行为（攻击所有敌对生物）。 */
+    private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
+    /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
+    private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
+    /** 本根火把启用的特殊伤害方式。 */
+    private final java.util.Set<String> specialDamageTypes = new java.util.TreeSet<>();
+    private boolean forceOneHealth;
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -140,6 +152,11 @@ public class WardSourceBlockEntity extends BlockEntity {
     public void setLevel(net.minecraft.world.level.Level level) {
         super.setLevel(level);
         if (level != null && !level.isClientSide) {
+            if (placementOrder <= 0) {
+                long tickBase = Math.max(1L, level.getGameTime()) * 1_000_000L;
+                placementOrder = tickBase + (++nextPlacementSequence % 1_000_000L);
+                setChanged();
+            }
             DamageEventHandler.register(level, getBlockPos());
         }
     }
@@ -153,6 +170,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     }
 
     /* ===== getter ===== */
+    public long getPlacementOrder() { return placementOrder; }
     public boolean isEnabled() { return enabled; }
     public boolean isChunkMode() { return chunkMode; }
     public int getChunkRadius() { return chunkRadius; }
@@ -168,13 +186,82 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isIgnoreNamed() { return ignoreNamed; }
     public void setIgnoreNamed(boolean v) { this.ignoreNamed = v; setChanged(); }
 
+    public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getDiscoveredMobTargetDefaults() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(discoveredMobTargets));
+    }
+    public void discoverMobTarget(net.minecraft.resources.ResourceLocation id, boolean defaultEnabled) {
+        if (id != null && (!discoveredMobTargets.containsKey(id) || discoveredMobTargets.get(id) != defaultEnabled)) {
+            discoveredMobTargets.put(id, defaultEnabled);
+            setChanged();
+            // 发现记录要持久化并最终同步给客户端，但不能每出现一种生物就广播方块更新。
+            // 每根火把最多每 100 tick 同步一次，GUI 打开时能拿到较新的完整名单。
+            if (level != null && !level.isClientSide
+                    && (lastDiscoverySync == Long.MIN_VALUE || level.getGameTime() - lastDiscoverySync >= 100)) {
+                lastDiscoverySync = level.getGameTime();
+                sync();
+            }
+        }
+    }
+    public void deleteMobTarget(net.minecraft.resources.ResourceLocation id) {
+        if (id == null) return;
+        boolean changed = discoveredMobTargets.remove(id);
+        changed |= mobTargets.remove(id) != null;
+        if (changed) { setChanged(); sync(); }
+    }
+
+    public boolean isForceOneHealth() { return forceOneHealth; }
+    public void setForceOneHealth(boolean enabled) { this.forceOneHealth = enabled; setChanged(); sync(); }
+
+    public java.util.Set<String> getSpecialDamageTypes() {
+        return java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(specialDamageTypes));
+    }
+    public void setSpecialDamageType(String id, boolean enabled) {
+        if (id == null || !java.util.Set.of("fire", "burn", "magic", "lightning", "wither").contains(id)) return;
+        if (enabled) specialDamageTypes.add(id); else specialDamageTypes.remove(id);
+        setChanged(); sync();
+    }
+
+    public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getMobTargets() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(mobTargets));
+    }
+
+    /**
+     * 是否存在针对该生物的显式名单设置。
+     * 未配置时必须回退到原有敌对/仇恨判定，不能因为配置了其他生物就被排除。
+     */
+    public boolean hasMobTargetOverride(net.minecraft.world.entity.EntityType<?> type) {
+        net.minecraft.resources.ResourceLocation id =
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        return id != null && mobTargets.containsKey(id);
+    }
+
+    /** 仅返回显式名单覆盖值；默认行为由原有敌对/仇恨规则决定。 */
+    public boolean isMobTargetAllowed(net.minecraft.world.entity.EntityType<?> type) {
+        net.minecraft.resources.ResourceLocation id =
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        return id != null && mobTargets.getOrDefault(id, false);
+    }
+
+    public void setMobTarget(net.minecraft.resources.ResourceLocation id, boolean enabled) {
+        if (id == null) return;
+        mobTargets.put(id, enabled);
+        setChanged();
+        sync();
+    }
+
+    public void removeMobTarget(net.minecraft.resources.ResourceLocation id) {
+        if (id != null && mobTargets.remove(id) != null) {
+            setChanged();
+            sync();
+        }
+    }
+
     /**
      * 放置时用配置文件里的「默认参数」初始化本方块。
      * 之后可通过 GUI 单独修改，不会影响其他火把。
      */
     public void applyDefaults() {
         try {
-            var c = com.torchcampfiredamage.config.ModConfig.class;
             this.enabled = com.torchcampfiredamage.config.ModConfig.DEFAULT_ENABLED.get();
             this.chunkMode = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_MODE.get();
             this.chunkRadius = com.torchcampfiredamage.config.ModConfig.DEFAULT_CHUNK_RADIUS.get();
@@ -295,8 +382,8 @@ public class WardSourceBlockEntity extends BlockEntity {
         } else {
             this.blockRadius = Math.max(0, Math.min(512, range));
         }
-        this.damage = Math.max(0, damage);
-        this.interval = Math.max(1, interval);
+        this.damage = Double.isFinite(damage) ? Math.max(0.0, Math.min(2048.0, damage)) : 2.0;
+        this.interval = Math.max(1, Math.min(12000, interval));
         this.glowing = glowing;
         this.slow = slow;
         this.announce = announce;
@@ -314,6 +401,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
+        tag.putLong("placementOrder", placementOrder);
         tag.putBoolean("enabled", enabled);
         tag.putBoolean("chunkMode", chunkMode);
         tag.putInt("chunkRadius", chunkRadius);
@@ -327,6 +415,26 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
         tag.putBoolean("ignoreNamed", ignoreNamed);
+        net.minecraft.nbt.ListTag mobTargetList = new net.minecraft.nbt.ListTag();
+        for (var entry : mobTargets.entrySet()) {
+            CompoundTag target = new CompoundTag();
+            target.putString("Id", entry.getKey().toString());
+            target.putBoolean("Enabled", entry.getValue());
+            mobTargetList.add(target);
+        }
+        tag.put("mobTargets", mobTargetList);
+        net.minecraft.nbt.ListTag discoveredList = new net.minecraft.nbt.ListTag();
+        for (var entry : discoveredMobTargets.entrySet()) {
+            CompoundTag discovered = new CompoundTag();
+            discovered.putString("Id", entry.getKey().toString());
+            discovered.putBoolean("Enabled", entry.getValue());
+            discoveredList.add(discovered);
+        }
+        tag.put("discoveredMobTargets", discoveredList);
+        net.minecraft.nbt.ListTag damageTypes = new net.minecraft.nbt.ListTag();
+        for (String id : specialDamageTypes) damageTypes.add(net.minecraft.nbt.StringTag.valueOf(id));
+        tag.put("specialDamageTypes", damageTypes);
+        tag.putBoolean("forceOneHealth", forceOneHealth);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -359,6 +467,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
+        if (tag.contains("placementOrder")) placementOrder = Math.max(0L, tag.getLong("placementOrder"));
         if (tag.contains("enabled")) enabled = tag.getBoolean("enabled");
         if (tag.contains("chunkMode")) chunkMode = tag.getBoolean("chunkMode");
         if (tag.contains("chunkRadius")) chunkRadius = tag.getInt("chunkRadius");
@@ -372,6 +481,36 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
         // 旧存档没有这个字段时，回落到全局配置
+        mobTargets.clear();
+        if (tag.contains("mobTargets", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag targets = tag.getList("mobTargets", Tag.TAG_COMPOUND);
+            for (int i = 0; i < targets.size(); i++) {
+                CompoundTag target = targets.getCompound(i);
+                net.minecraft.resources.ResourceLocation id =
+                        net.minecraft.resources.ResourceLocation.tryParse(target.getString("Id"));
+                if (id != null) mobTargets.put(id, target.getBoolean("Enabled"));
+            }
+        }
+        discoveredMobTargets.clear();
+        if (tag.contains("discoveredMobTargets", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag discovered = tag.getList("discoveredMobTargets", Tag.TAG_COMPOUND);
+            for (int i=0;i<discovered.size();i++) {
+                CompoundTag item = discovered.getCompound(i);
+                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(item.getString("Id"));
+                if (id != null) discoveredMobTargets.put(id, item.getBoolean("Enabled"));
+            }
+        }
+        forceOneHealth = tag.getBoolean("forceOneHealth");
+        specialDamageTypes.clear();
+        if (tag.contains("specialDamageTypes", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag types = tag.getList("specialDamageTypes", Tag.TAG_STRING);
+            for (int i = 0; i < types.size(); i++) {
+                String id = types.getString(i);
+                if (java.util.Set.of("fire", "burn", "magic", "lightning", "wither").contains(id)) specialDamageTypes.add(id);
+            }
+        }
+        // 旧版存档中的显式配置也视为已发现，避免升级后列表项目消失。
+        for (var entry : mobTargets.entrySet()) discoveredMobTargets.putIfAbsent(entry.getKey(), entry.getValue());
         if (tag.contains("ignoreNamed")) {
             ignoreNamed = tag.getBoolean("ignoreNamed");
         } else {

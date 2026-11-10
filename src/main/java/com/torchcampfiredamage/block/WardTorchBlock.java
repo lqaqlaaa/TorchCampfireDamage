@@ -36,9 +36,15 @@ public class WardTorchBlock extends Block implements EntityBlock {
         return AIM_SHAPE;
     }
 
-    // 注意：不要覆写 getCollisionShape()
-    // Properties.noCollission() 已经把它设成 Shapes.empty()，
-    // 手动覆写反而可能导致某些情况下碰撞判定异常。
+    /**
+     * 物理碰撞箱：明确返回空形状。
+     * 即使注册属性或其他逻辑发生变化，玩家和生物也不会站在/撞上这个方块。
+     */
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos,
+                                        CollisionContext ctx) {
+        return Shapes.empty();
+    }
 
     /** 不遮挡视线 */
     @Override

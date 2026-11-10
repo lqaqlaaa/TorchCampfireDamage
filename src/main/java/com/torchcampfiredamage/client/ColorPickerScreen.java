@@ -218,6 +218,7 @@ public class ColorPickerScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
 
         int gw = COLS * cell;

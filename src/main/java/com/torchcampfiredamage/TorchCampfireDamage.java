@@ -5,8 +5,10 @@ import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.events.DamageEventHandler;
 import com.torchcampfiredamage.events.InteractionHandler;
 import com.torchcampfiredamage.events.OffhandTorchHandler;
-import com.torchcampfiredamage.network.UpdateWardPayload;
+import com.torchcampfiredamage.network.PlayerMobTargetsRequestPayload;
 import com.torchcampfiredamage.network.UpdateOrbitPayload;
+import com.torchcampfiredamage.network.UpdateWardPayload;
+import com.torchcampfiredamage.network.WardMobTargetsPayload;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -28,21 +30,14 @@ public class TorchCampfireDamage {
     public TorchCampfireDamage(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("[TorchCampfireDamage] Constructing mod...");
 
-        // 配置
         modContainer.registerConfig(Type.COMMON, ModConfig.SPEC);
-
-        // 方块 / 物品 / 方块实体
         ModBlocks.register(modEventBus);
 
-        // 游戏事件
         NeoForge.EVENT_BUS.register(new DamageEventHandler());
         NeoForge.EVENT_BUS.register(new InteractionHandler());
         NeoForge.EVENT_BUS.register(new OffhandTorchHandler());
 
-        // 网络包
         modEventBus.addListener(this::registerPayloads);
-
-        // 创造模式物品栏
         modEventBus.addListener(this::addToCreativeTab);
 
         LOGGER.info("[TorchCampfireDamage] Mod constructed successfully.");
@@ -50,14 +45,22 @@ public class TorchCampfireDamage {
 
     private void registerPayloads(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(
-                UpdateWardPayload.TYPE,
-                UpdateWardPayload.CODEC,
-                UpdateWardPayload::handle);
-        registrar.playToServer(
-                UpdateOrbitPayload.TYPE,
-                UpdateOrbitPayload.CODEC,
-                UpdateOrbitPayload::handle);
+        registrar.playToServer(UpdateWardPayload.TYPE, UpdateWardPayload.CODEC, UpdateWardPayload::handle);
+        registrar.playToServer(UpdateOrbitPayload.TYPE, UpdateOrbitPayload.CODEC, UpdateOrbitPayload::handle);
+        registrar.playToServer(PlayerMobTargetsRequestPayload.TYPE, PlayerMobTargetsRequestPayload.CODEC,
+                PlayerMobTargetsRequestPayload::handle);
+        registrar.playToServer(WardMobTargetsPayload.TYPE, WardMobTargetsPayload.CODEC, WardMobTargetsPayload::handle);
+        registrar.playToServer(com.torchcampfiredamage.network.WardDamageTypesPayload.TYPE,
+                com.torchcampfiredamage.network.WardDamageTypesPayload.CODEC,
+                com.torchcampfiredamage.network.WardDamageTypesPayload::handle);
+
+        if (net.neoforged.fml.loading.FMLEnvironment.dist
+                == net.neoforged.api.distmarker.Dist.DEDICATED_SERVER) {
+            registrar.playToClient(
+                    com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.TYPE,
+                    com.torchcampfiredamage.network.PlayerMobTargetsSyncPayload.CODEC,
+                    (payload, context) -> {});
+        }
         LOGGER.info("[TorchCampfireDamage] Payloads registered.");
     }
 
@@ -65,7 +68,6 @@ public class TorchCampfireDamage {
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
             event.accept(ModBlocks.WARD_TORCH_ITEM.get());
         }
-        // 护符放进"杂项/工具"类标签，方便创造模式获取
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModBlocks.WARD_CHARM_ITEM.get());
         }

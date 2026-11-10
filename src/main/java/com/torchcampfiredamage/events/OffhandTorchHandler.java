@@ -1,12 +1,12 @@
 package com.torchcampfiredamage.events;
 
-import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.config.ModConfig;
+import com.torchcampfiredamage.block.ModBlocks;
+import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -17,6 +17,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -24,11 +25,11 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import java.util.*;
 
 /**
- * 副手火把效果。
+ * Curios 守卫护符效果（玩家级攻击源）。
  * <p>
- * 玩家副手持守卫火把时，以其所在区块为中心造成范围伤害。
+ * 仅在 Curios 饰品栏装备守卫护符时生效；主手/副手持有物品均不会触发。
  * 伤害值取玩家当前的 ATTACK_DAMAGE 属性（含武器/附魔/修饰符）。
- * 默认每 tick 一次、不播报、不吸掉落物/经验。
+ * 攻击名单保存在玩家级 SavedData，与每根放置火把的名单互不影响。
  */
 public class OffhandTorchHandler {
     private static final int CHUNK = SectionPos.SECTION_SIZE;
@@ -55,16 +56,8 @@ public class OffhandTorchHandler {
         for (Player p : level.players()) {
             if (!(p instanceof ServerPlayer sp)) continue;
 
-            // 副手必须是守卫火把
-            ItemStack off = sp.getItemInHand(InteractionHand.OFF_HAND);
-            // 生效条件（任一满足即可）：
-            //   1) 副手持守卫护符
-            //   2) 副手持守卫火把（不影响方块放置）
-            //   3) Curios 饰品栏里装备了守卫护符
-            boolean isCharm = !off.isEmpty() && off.is(ModBlocks.WARD_CHARM_ITEM.get());
-            boolean isTorch = !off.isEmpty() && off.is(ModBlocks.WARD_TORCH_ITEM.get());
-            boolean hasCurioCharm = hasCharmEquipped(sp);
-            if (!isCharm && !isTorch && !hasCurioCharm) {
+            // 只允许通过 Curios 饰品栏装备守卫护符触发；手持不再触发。
+            if (!hasCharmEquipped(sp)) {
                 lastTime.remove(sp.getUUID());
                 continue;
             }
@@ -73,7 +66,14 @@ public class OffhandTorchHandler {
             if (now - last < interval) continue;
             lastTime.put(sp.getUUID(), now);
 
-            float dmg = getAttackDamage(sp);
+            float dmg;
+            try {
+                dmg = ModConfig.OFFHAND_FIXED_DAMAGE_MODE.get()
+                        ? ModConfig.OFFHAND_FIXED_DAMAGE.get().floatValue()
+                        : getAttackDamage(sp);
+            } catch (Throwable t) {
+                dmg = getAttackDamage(sp);
+            }
 
             int cx = SectionPos.blockToSectionCoord(sp.getBlockX());
             int cz = SectionPos.blockToSectionCoord(sp.getBlockZ());
@@ -93,7 +93,7 @@ public class OffhandTorchHandler {
                 slow = ModConfig.OFFHAND_SLOW.get();
                 tpDrops = ModConfig.OFFHAND_TELEPORT_DROPS.get();
                 tpXp = ModConfig.OFFHAND_TELEPORT_XP.get();
-                ignoreNamed = ModConfig.IGNORE_NAMED_MOBS.get();
+                ignoreNamed = ModConfig.OFFHAND_IGNORE_NAMED_MOBS.get();
             } catch (Throwable t) {
                 announce = false; glowing = false; slow = false;
                 tpDrops = false; tpXp = false; ignoreNamed = true;
@@ -102,10 +102,19 @@ public class OffhandTorchHandler {
             Set<UUID> done = new HashSet<>();
 
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
-                if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
-                // 与方块火把一致：跳过被命名的生物（白名单保护）
+                if (!mob.isAlive()) continue;
+                // 护符攻击范围内自动记录发现的实体类型；名单保存在玩家级 SavedData。
+                PlayerMobTargetsData mobTargets = PlayerMobTargetsData.get(level.getServer());
+                mobTargets.discover(sp.getUUID(), net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()), isHostile(mob));
+                if (done.contains(mob.getUUID())) continue;
+                // 与放置火把一致：跳过被命名的生物（白名单保护）
                 if (ignoreNamed && mob.hasCustomName()) continue;
-                if (!isHostile(mob)) continue;
+                // 显式名单只覆盖对应实体；名单外继续执行原有敌对/仇恨判定。
+                if (mobTargets.hasOverride(sp.getUUID(), mob.getType())) {
+                    if (!mobTargets.isEnabled(sp.getUUID(), mob.getType())) continue;
+                } else if (!isHostile(mob)) {
+                    continue;
+                }
 
                 if (glowing) mob.setGlowingTag(true);
                 if (slow) {
@@ -118,17 +127,29 @@ public class OffhandTorchHandler {
                 }
 
                 DamageSource src = level.damageSources().playerAttack(sp);
-                boolean ok = mob.hurt(src, dmg);
-                if (!ok) {
+                ItemStack weapon = sp.getMainHandItem();
+                float enchantedDamage = EnchantmentHelper.modifyDamage(level, weapon, mob, src, dmg);
+                if (ModConfig.OFFHAND_FORCE_ONE_HEALTH.get()) {
+                    float originalHealth = mob.getHealth();
+                    mob.setHealth(1.0F);
                     mob.invulnerableTime = 0;
-                    mob.setHealth(Math.max(0f, mob.getHealth() - dmg));
-                    if (mob.getHealth() <= 0f) mob.die(src);
+                    boolean killed = mob.hurt(src, Math.max(1.0F, enchantedDamage));
+                    if (!killed && mob.isAlive()) mob.setHealth(originalHealth);
+                } else {
+                    boolean ok = mob.hurt(src, enchantedDamage);
+                    if (ok) {
+                        EnchantmentHelper.doPostAttackEffectsWithItemSource(level, mob, src, weapon);
+                    } else {
+                        mob.invulnerableTime = 0;
+                        mob.setHealth(Math.max(0f, mob.getHealth() - enchantedDamage));
+                        if (mob.getHealth() <= 0f) mob.die(src);
+                    }
                 }
                 done.add(mob.getUUID());
 
                 if (!mob.isAlive() && announce) {
                     sp.sendSystemMessage(Component.literal(
-                            "§6[副手火把] §e" + mob.getName().getString() + "§7 被烧死了"));
+                            "§6[护符] §e" + mob.getName().getString() + "§7 被烧死了"));
                 }
             }
         }
