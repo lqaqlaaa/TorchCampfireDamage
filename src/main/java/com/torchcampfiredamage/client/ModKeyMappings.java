@@ -16,7 +16,7 @@ public final class ModKeyMappings {
             "key.torchcampfiredamage.open_settings",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_O,
-            "key.categories.misc"
+            "key.categories.torchcampfiredamage"
     );
 
     private ModKeyMappings() {}
