@@ -184,10 +184,12 @@ public class DamageEventHandler {
         // LinkedHashSet 保留服务端登记顺序；较早登记的火把在重叠区域拥有优先权。
         List<BlockPos> snapshot = new ArrayList<>(torches);
         List<WardRegion> orderedRegions = new ArrayList<>(snapshot.size());
+        Map<BlockPos, WardSourceBlockEntity> activeWards = new HashMap<>();
         for (BlockPos pos : snapshot) {
             BlockEntity entity = level.getBlockEntity(pos);
-            if (entity instanceof WardSourceBlockEntity ward && ward.isEnabled()) {
-                orderedRegions.add(new WardRegion(pos, ward, damageArea(pos, ward)));
+            if (entity instanceof WardSourceBlockEntity ward) {
+                activeWards.put(pos, ward);
+                if (ward.isEnabled()) orderedRegions.add(new WardRegion(pos, ward, damageArea(pos, ward)));
             }
         }
         // 使用写入方块实体 NBT 的放置序号，而不是区块加载顺序或 HashSet 顺序。
@@ -197,8 +199,8 @@ public class DamageEventHandler {
         List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
-            BlockEntity be = level.getBlockEntity(ip);
-            if (!(be instanceof WardSourceBlockEntity ward)) {
+            WardSourceBlockEntity ward = activeWards.get(ip);
+            if (ward == null) {
                 unregister(level, ip);
                 continue;
             }
