@@ -26,7 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** 当前单根放置火把的附魔管理界面；候选附魔只从玩家手持的附魔书读取。 */
+/** 当前单根放置火把的附魔管理界面；打开时自动扫描玩家背包中的全部附魔书。 */
 public final class WardEnchantmentsScreen extends Screen {
     private int rowsPerPage = 1;
     private int rowHeight = 30;
@@ -34,6 +34,7 @@ public final class WardEnchantmentsScreen extends Screen {
     private int panelWidth;
     private int panelLeft;
     private int footerY;
+    private int statusY;
     private final Screen parent;
     private final ResourceLocation ignored;
     private final net.minecraft.core.BlockPos pos;
@@ -43,7 +44,7 @@ public final class WardEnchantmentsScreen extends Screen {
     private final List<net.minecraft.client.gui.components.AbstractWidget> rowWidgets = new ArrayList<>();
     private EditBox search;
     private int page;
-    private String status = "手持附魔书后，点击“读取手持附魔书”导入候选附魔";
+    private String status = "打开界面时会自动扫描背包中的所有附魔书";
 
     public WardEnchantmentsScreen(Screen parent, net.minecraft.core.BlockPos pos, Map<ResourceLocation, Integer> current) {
         super(Component.literal("放置火把攻击附魔"));
@@ -80,45 +81,79 @@ public final class WardEnchantmentsScreen extends Screen {
         panelWidth = Math.max(80, Math.min(500, width - 16));
         panelLeft = (width - panelWidth) / 2;
         footerY = height - 24;
-        listTop = 82;
+        boolean compact = panelWidth < 300;
+        listTop = compact ? 108 : 82;
+        statusY = compact ? 80 : 54;
         int availableHeight = Math.max(28, footerY - listTop - 8);
         rowsPerPage = Math.max(1, Math.min(6, availableHeight / 32));
         rowHeight = Math.max(28, Math.min(36, availableHeight / rowsPerPage));
 
-        search = new EditBox(font, panelLeft, 30, Math.max(40, panelWidth - 112), 20, Component.literal("搜索已导入附魔"));
+        int gap = 4;
+        int scanY = compact ? 54 : 30;
+        int searchW = compact ? panelWidth : Math.max(40, panelWidth - 190);
+        search = new EditBox(font, panelLeft, 30, searchW, 20, Component.literal("搜索已导入附魔"));
         search.setHint(Component.literal("搜索附魔名称"));
         search.setResponder(value -> { page = 0; rebuildRows(); });
         addRenderableWidget(search);
-        addRenderableWidget(Button.builder(Component.literal("读取手持附魔书"), b -> importHeldBooks())
-                .bounds(panelLeft + panelWidth - 106, 30, 106, 20).build());
+        int scanX = compact ? panelLeft : panelLeft + searchW + gap;
+        int scanW = compact ? Math.max(32, (panelWidth - gap) / 2) : 82;
+        int bulkX = compact ? panelLeft + scanW + gap : scanX + scanW + gap;
+        int bulkW = compact ? Math.max(32, panelWidth - scanW - gap)
+                : Math.max(40, panelWidth - searchW - scanW - gap * 2);
+        addRenderableWidget(Button.builder(Component.literal("重新扫描"), b -> scanInventoryBooks())
+                .bounds(scanX, scanY, scanW, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("全部添加"), b -> addAllCandidates())
+                .bounds(bulkX, scanY, bulkW, 20).build());
+
         int buttonW = Math.max(34, Math.min(64, (panelWidth - 12) / 4));
-        int gap = 4;
-        int total = buttonW * 4 + gap * 3;
+        int footerGap = 4;
+        int total = buttonW * 4 + footerGap * 3;
         int startX = panelLeft + (panelWidth - total) / 2;
         addRenderableWidget(Button.builder(Component.literal("‹"), b -> { if (page > 0) { page--; rebuildRows(); } })
                 .bounds(startX, footerY, buttonW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
-                .bounds(startX + buttonW + gap, footerY, buttonW, 20).build());
+                .bounds(startX + buttonW + footerGap, footerY, buttonW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("›"), b -> {
             if ((page + 1) * rowsPerPage < filtered().size()) { page++; rebuildRows(); }
-        }).bounds(startX + (buttonW + gap) * 2, footerY, buttonW, 20).build());
+        }).bounds(startX + (buttonW + footerGap) * 2, footerY, buttonW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("清空搜索"), b -> {
             search.setValue(""); page = 0; rebuildRows();
-        }).bounds(startX + (buttonW + gap) * 3, footerY, buttonW, 20).build());
+        }).bounds(startX + (buttonW + footerGap) * 3, footerY, buttonW, 20).build());
+
+        scanInventoryBooks();
         rebuildRows();
     }
 
-    private void importHeldBooks() {
+    /** 扫描快捷栏、主背包和副手；同一种附魔保留发现的最高等级。 */
+    private void scanInventoryBooks() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         int before = candidates.size();
         int found = 0;
-        found += readBook(mc.player.getMainHandItem());
-        found += readBook(mc.player.getOffhandItem());
-        status = found == 0
-                ? "主手和副手都没有带附魔的附魔书"
-                : "已读取 " + found + " 条附魔；新增/更新候选 " + (candidates.size() - before) + " 种（不会消耗附魔书）";
+        for (ItemStack stack : mc.player.getInventory().items) found += readBook(stack);
+        for (ItemStack stack : mc.player.getInventory().offhand) found += readBook(stack);
+        int added = candidates.size() - before;
+        status = found == 0 ? "背包中没有找到附魔书（已配置附魔仍会保留）"
+                : "扫描到 " + found + " 条附魔记录，发现 " + added + " 种新附魔；不会消耗书籍";
         page = 0;
+        if (search != null) rebuildRows();
+    }
+
+    /** 一键把背包扫描到的全部候选附魔应用到当前火把。 */
+    private void addAllCandidates() {
+        if (candidates.isEmpty()) {
+            status = "没有可添加的附魔，请先把附魔书放入背包";
+            return;
+        }
+        int count = 0;
+        for (Map.Entry<ResourceLocation, Integer> entry : candidates.entrySet()) {
+            ResourceLocation id = entry.getKey();
+            int level = Math.max(1, entry.getValue());
+            configured.put(id, level);
+            PacketDistributor.sendToServer(new WardEnchantmentsPayload(pos, 0, id.toString(), level));
+            count++;
+        }
+        status = "已将 " + count + " 种背包附魔全部添加到当前火把";
         rebuildRows();
     }
 
@@ -129,7 +164,7 @@ public final class WardEnchantmentsScreen extends Screen {
         int count = 0;
         for (var entry : stored.entrySet()) {
             Holder<Enchantment> holder = entry.getKey();
-            holder.unwrapKey().ifPresent(key -> candidates.put(key.location(), entry.getIntValue()));
+            holder.unwrapKey().ifPresent(key -> candidates.merge(key.location(), entry.getIntValue(), Math::max));
             count++;
         }
         return count;
@@ -192,13 +227,13 @@ public final class WardEnchantmentsScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(font, "守卫火把", 14, 10, 0xFF70AEFF, false);
         graphics.drawCenteredString(font, "放置火把 · 攻击附魔", width / 2, 10, GuiLayout.TEXT);
-        graphics.drawString(font, "可读取主手/副手附魔书；读取和添加均不会消耗书。", panelLeft, 54, 0xCCCCCC);
-        graphics.drawString(font, status, panelLeft, 66, 0x88CCFF);
+        graphics.drawString(font, "自动扫描背包附魔书 · 支持一次性全部添加 · 不消耗物品", panelLeft, statusY, 0xCCCCCC);
+        graphics.drawString(font, status, panelLeft, statusY + 12, 0x88CCFF);
         List<ResourceLocation> ids = filtered();
         int pageCount = Math.max(1, (ids.size() + rowsPerPage - 1) / rowsPerPage);
         graphics.drawString(font, "候选 " + candidates.size() + " 种 · 当前火把已配置 " + configured.size()
                 + " 种 · 第 " + (page + 1) + " / " + pageCount + " 页",
-                panelLeft, 42, 0xFFFFFF);
+                panelLeft, statusY - 12, 0xFFFFFF);
         for (int row = 0; row < rowsPerPage && page * rowsPerPage + row < ids.size(); row++) {
             ResourceLocation id = ids.get(page * rowsPerPage + row);
             int y = listTop + row * rowHeight;
