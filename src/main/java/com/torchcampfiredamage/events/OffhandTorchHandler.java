@@ -17,6 +17,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -118,10 +119,15 @@ public class OffhandTorchHandler {
                 }
 
                 DamageSource src = level.damageSources().playerAttack(sp);
-                boolean ok = mob.hurt(src, dmg);
-                if (!ok) {
+                ItemStack weapon = sp.getMainHandItem();
+                float enchantedDamage = EnchantmentHelper.modifyDamage(level, weapon, mob, src, dmg);
+                boolean ok = mob.hurt(src, enchantedDamage);
+                if (ok) {
+                    // Apply weapon enchantment post-attack effects (e.g. fire aspect).
+                    EnchantmentHelper.doPostAttackEffectsWithItemSource(level, mob, src, weapon);
+                } else {
                     mob.invulnerableTime = 0;
-                    mob.setHealth(Math.max(0f, mob.getHealth() - dmg));
+                    mob.setHealth(Math.max(0f, mob.getHealth() - enchantedDamage));
                     if (mob.getHealth() <= 0f) mob.die(src);
                 }
                 done.add(mob.getUUID());
