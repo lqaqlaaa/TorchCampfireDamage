@@ -64,7 +64,7 @@ public final class MobTargetsScreen extends Screen {
             PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
             int y = listTop + (i - start) * rowHeight;
             int right = left + listWidth;
-            boolean configured = isConfigured(entry.entityId());
+            boolean configured = entry.configured();
             int toggleW = 54;
             int resetW = 42;
             int toggleX = right - resetW - toggleW - 8;
@@ -74,9 +74,13 @@ public final class MobTargetsScreen extends Screen {
                     Component.literal(entry.enabled() ? "§a开启" : "§c关闭"),
                     button -> send(ACTION_SET, entry.entityId(), !entry.enabled()))
                     .bounds(toggleX, y + 2, toggleW, 20).build());
-            if (configured) {
+            if (!configured) {
+                addRenderableWidget(Button.builder(Component.literal("删除"),
+                        button -> send(3, entry.entityId(), false))
+                        .bounds(resetX, y + 2, resetW, 20).build());
+            } else {
                 addRenderableWidget(Button.builder(Component.literal("默认"),
-                        button -> send(ACTION_REMOVE, entry.entityId(), false))
+                        button -> send(2, entry.entityId(), false))
                         .bounds(resetX, y + 2, resetW, 20).build());
             }
         }
@@ -126,8 +130,12 @@ public final class MobTargetsScreen extends Screen {
         for (var entry : nearby.entrySet()) {
             boolean defaultEnabled = isHostile(entry.getValue());
             PlayerMobTargetsSyncPayload.Entry override = findConfigured(entry.getKey().toString());
+            PacketDistributor.sendToServer(new PlayerMobTargetsRequestPayload(4, entry.getKey().toString(), defaultEnabled));
             result.add(new PlayerMobTargetsSyncPayload.Entry(entry.getKey().toString(),
-                    override == null ? defaultEnabled : override.enabled()));
+                    override == null ? defaultEnabled : override.enabled(), override != null));
+        }
+        for (PlayerMobTargetsSyncPayload.Entry saved : targets) {
+            if (result.stream().noneMatch(e -> e.entityId().equals(saved.entityId()))) result.add(saved);
         }
         return result;
     }
@@ -162,8 +170,11 @@ public final class MobTargetsScreen extends Screen {
         PacketDistributor.sendToServer(new PlayerMobTargetsRequestPayload(action, id, enabled));
         if (action == ACTION_SET) {
             targets.removeIf(e -> e.entityId().equals(id));
-            targets.add(new PlayerMobTargetsSyncPayload.Entry(id, enabled));
-        } else if (action == ACTION_REMOVE) {
+            targets.add(new PlayerMobTargetsSyncPayload.Entry(id, enabled, true));
+        } else if (action == 2) {
+            targets.removeIf(e -> e.entityId().equals(id));
+            targets.add(new PlayerMobTargetsSyncPayload.Entry(id, false, false));
+        } else if (action == 3) {
             targets.removeIf(e -> e.entityId().equals(id));
         }
         init();
@@ -205,7 +216,7 @@ public final class MobTargetsScreen extends Screen {
                     : BuiltInRegistries.ENTITY_TYPE.getOptional(id)
                     .map(type -> type.getDescription().getString()).orElse(entry.entityId());
             String state = entry.enabled() ? "开启" : "关闭";
-            if (!isConfigured(entry.entityId())) state += "（默认）";
+            if (!entry.configured()) state += "（默认）";
             graphics.drawString(font, font.plainSubstrByWidth(name + " · " + state, listWidth - 120),
                     left + 8, y + 7, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             graphics.drawString(font, entry.entityId(), left + 8, y + 16, 0x888888);
