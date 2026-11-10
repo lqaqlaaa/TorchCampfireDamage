@@ -52,6 +52,14 @@ public class GlobalSettingsScreen extends Screen {
     private final List<Row> allRows = new ArrayList<>();
     private int page = 0;
     private int pageCount = 1;
+    // 0 = 真正全局规则，1 = 副手火把，2 = 新放置火把默认值
+    private int activeCategory = 0;
+
+    private List<Row> visibleRows() {
+        int from = activeCategory == 0 ? 0 : activeCategory == 1 ? 10 : 18;
+        int to = activeCategory == 0 ? 10 : activeCategory == 1 ? 18 : allRows.size();
+        return allRows.subList(Math.min(from, allRows.size()), Math.min(to, allRows.size()));
+    }
 
     public GlobalSettingsScreen(Screen parent) {
         super(Component.literal("全局设置"));
@@ -185,7 +193,7 @@ public class GlobalSettingsScreen extends Screen {
     /* ================= 自适应布局计算 ================= */
 
     /** 预留：标题 + 页码 + 底部两行按钮 */
-    private static final int RESERVED_TOP = 26;
+    private static final int RESERVED_TOP = 50;
     private static final int RESERVED_BOTTOM = 56;
 
     @Override
@@ -231,7 +239,7 @@ public class GlobalSettingsScreen extends Screen {
         if (boxH < 10) boxH = 10;
 
         /* -------- 4. 分页数 -------- */
-        pageCount = Math.max(1, (allRows.size() + itemsPerPage - 1) / itemsPerPage);
+        pageCount = Math.max(1, (visibleRows().size() + itemsPerPage - 1) / itemsPerPage);
         if (page >= pageCount) page = pageCount - 1;
 
         /* -------- 5. 定位 -------- */
@@ -253,7 +261,8 @@ public class GlobalSettingsScreen extends Screen {
         this.clearWidgets();
 
         int start = page * itemsPerPage();
-        int end = Math.min(allRows.size(), start + itemsPerPage());
+        List<Row> rows = visibleRows();
+        int end = Math.min(rows.size(), start + itemsPerPage());
 
         int colStep = labelW + boxW + 10;
 
@@ -263,7 +272,23 @@ public class GlobalSettingsScreen extends Screen {
             int rowIdx = idx / cols;
             int x = px + col * colStep + labelW;
             int y = py + rowIdx * rowH;
-            allRows.get(i).build(this, x, y);
+            rows.get(i).build(this, x, y);
+        }
+
+        // 顶部分类导航：让设置归属一眼可见
+        int tabY = 30;
+        int tabGap = 4;
+        int tabW = Math.max(54, Math.min(104, (this.width - 24 - tabGap * 2) / 3));
+        int tabX = (this.width - (tabW * 3 + tabGap * 2)) / 2;
+        String[] tabs = {"全局规则", "副手火把", "新火把默认值"};
+        for (int i = 0; i < tabs.length; i++) {
+            final int category = i;
+            Component label = Component.literal((activeCategory == i ? "§e▶ " : "") + tabs[i]);
+            addRenderableWidget(Button.builder(label, b -> {
+                activeCategory = category;
+                page = 0;
+                init();
+            }).bounds(tabX + i * (tabW + tabGap), tabY, tabW, 18).build());
         }
 
         /* ---- 底部按钮：两行，全部保证在屏幕内 ---- */
@@ -354,26 +379,6 @@ public class GlobalSettingsScreen extends Screen {
             ModConfig.GLOW_DURATION.set(100);
             ModConfig.SLOW_DURATION.set(100);
 
-            ModConfig.OFFHAND_ENABLED.set(true);
-            ModConfig.OFFHAND_CHUNK_RADIUS.set(1);
-            ModConfig.OFFHAND_INTERVAL.set(1);
-            ModConfig.OFFHAND_ANNOUNCE.set(false);
-            ModConfig.OFFHAND_GLOWING.set(false);
-            ModConfig.OFFHAND_SLOW.set(false);
-            ModConfig.OFFHAND_TELEPORT_DROPS.set(false);
-            ModConfig.OFFHAND_TELEPORT_XP.set(false);
-
-            ModConfig.DEFAULT_ENABLED.set(true);
-            ModConfig.DEFAULT_CHUNK_MODE.set(true);
-            ModConfig.DEFAULT_CHUNK_RADIUS.set(1);
-            ModConfig.DEFAULT_BLOCK_RADIUS.set(16);
-            ModConfig.DEFAULT_DAMAGE.set(2.0);
-            ModConfig.DEFAULT_INTERVAL.set(20);
-            ModConfig.DEFAULT_GLOWING.set(false);
-            ModConfig.DEFAULT_SLOW.set(false);
-            ModConfig.DEFAULT_ANNOUNCE.set(true);
-            ModConfig.DEFAULT_TELEPORT_DROPS.set(true);
-            ModConfig.DEFAULT_TELEPORT_XP.set(true);
             saveConfig();
         } catch (Throwable ignored) {
         }
@@ -391,11 +396,13 @@ public class GlobalSettingsScreen extends Screen {
 
         // 页码信息
         String pg = "第 " + (page + 1) + " / " + pageCount + " 页";
-        gg.drawCenteredString(this.font, pg, this.width / 2, 18, 0xAAAAAA);
+        String categoryName = activeCategory == 0 ? "全局规则" : activeCategory == 1 ? "副手火把设置" : "新放置火把默认值";
+        gg.drawCenteredString(this.font, categoryName + "  ·  " + pg, this.width / 2, 18, 0xAAAAAA);
 
         // 标签
         int start = page * itemsPerPage();
-        int end = Math.min(allRows.size(), start + itemsPerPage());
+        List<Row> rows = visibleRows();
+        int end = Math.min(rows.size(), start + itemsPerPage());
         int colStep = labelW + boxW + 10;
 
         for (int i = start; i < end; i++) {
@@ -406,7 +413,7 @@ public class GlobalSettingsScreen extends Screen {
             int ly = py + rowIdx * rowH;
             // 垂直居中对齐控件
             int textY = ly + (boxH - 8) / 2;
-            gg.drawString(this.font, allRows.get(i).label(), lx, textY, 0xFFFFFF);
+            gg.drawString(this.font, rows.get(i).label(), lx, textY, 0xFFFFFF);
         }
     }
 
