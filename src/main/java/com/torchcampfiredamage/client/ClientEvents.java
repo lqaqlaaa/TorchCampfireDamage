@@ -29,7 +29,7 @@ public class ClientEvents {
         LocalPlayer player = mc.player;
         if (ModKeyMappings.OPEN_SETTINGS.consumeClick()) {
             if (player != null && mc.level != null && mc.screen == null) {
-                mc.setScreen(new GlobalSettingsScreen(null));
+                mc.setScreen(new ImGuiSettingsScreen(null));
             }
             return;
         }
