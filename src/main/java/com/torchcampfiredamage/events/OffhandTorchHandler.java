@@ -2,6 +2,7 @@ package com.torchcampfiredamage.events;
 
 import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.config.ModConfig;
+import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -106,6 +107,7 @@ public class OffhandTorchHandler {
                 if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
                 // 与方块火把一致：跳过被命名的生物（白名单保护）
                 if (ignoreNamed && mob.hasCustomName()) continue;
+                if (!PlayerMobTargetsData.get(level.getServer()).isEnabled(sp.getUUID(), mob.getType())) continue;
                 if (!isHostile(mob)) continue;
 
                 if (glowing) mob.setGlowingTag(true);
