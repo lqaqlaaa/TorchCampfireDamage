@@ -174,11 +174,21 @@ public class WardSourceBlockEntity extends BlockEntity {
         return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(mobTargets));
     }
 
+    /**
+     * 是否存在针对该生物的显式名单设置。
+     * 未配置时必须回退到原有敌对/仇恨判定，不能因为配置了其他生物就被排除。
+     */
+    public boolean hasMobTargetOverride(net.minecraft.world.entity.EntityType<?> type) {
+        net.minecraft.resources.ResourceLocation id =
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        return id != null && mobTargets.containsKey(id);
+    }
+
+    /** 仅返回显式名单覆盖值；默认行为由原有敌对/仇恨规则决定。 */
     public boolean isMobTargetAllowed(net.minecraft.world.entity.EntityType<?> type) {
         net.minecraft.resources.ResourceLocation id =
                 net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
-        if (id == null || mobTargets.isEmpty()) return true;
-        return mobTargets.getOrDefault(id, false);
+        return id != null && mobTargets.getOrDefault(id, false);
     }
 
     public void setMobTarget(net.minecraft.resources.ResourceLocation id, boolean enabled) {
