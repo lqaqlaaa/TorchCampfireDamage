@@ -3,7 +3,6 @@ package com.torchcampfiredamage.events;
 import com.torchcampfiredamage.TorchCampfireDamage;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import com.torchcampfiredamage.config.ModConfig;
-import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -231,34 +230,14 @@ public class DamageEventHandler {
         // 命名生物白名单：优先使用本火把自己的设置（右键界面可单独调整）
         boolean ignoreNamed = ward.isIgnoreNamed();
 
-        // 大范围保护：AABB 过大时改用「按区块分段查询」，避免单次查询扫描过多 section
-        java.util.List<Mob> candidates;
-        double areaX = area.maxX - area.minX;
-        double areaZ = area.maxZ - area.minZ;
-        if (areaX * areaZ > 256.0 * 256.0) {
-            // 超过 256x256 时，以火把为中心按半径分段查询（每段 128 格）
-            candidates = new ArrayList<>();
-            double halfX = areaX / 2.0;
-            double halfZ = areaZ / 2.0;
-            double step = 128.0;
-            for (double ox = -halfX; ox < halfX; ox += step) {
-                for (double oz = -halfZ; oz < halfZ; oz += step) {
-                    AABB sub = new AABB(
-                            area.minX + ox, area.minY, area.minZ + oz,
-                            Math.min(area.minX + ox + step, area.maxX),
-                            area.maxY,
-                            Math.min(area.minZ + oz + step, area.maxZ));
-                    candidates.addAll(level.getEntitiesOfClass(Mob.class, sub));
-                }
-            }
-        } else {
-            candidates = level.getEntitiesOfClass(Mob.class, area);
-        }
+        // Minecraft 的实体查询本身会利用实体区块分区；把大 AABB 切成许多小 AABB
+        // 会重复访问相邻区域、创建大量列表并合并结果。一次查询即可避免这些额外开销。
+        java.util.List<Mob> candidates = level.getEntitiesOfClass(Mob.class, area);
 
         for (Mob mob : candidates) {
             if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
-            if (owner != null && !PlayerMobTargetsData.get(level.getServer()).isEnabled(owner.getUUID(), mob.getType())) continue;
+            if (!ward.isMobTargetAllowed(mob.getType())) continue;
             if (!isHostileToPlayers(mob)) continue;
 
             if (glowing) {
