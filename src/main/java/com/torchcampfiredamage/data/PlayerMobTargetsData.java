@@ -74,6 +74,11 @@ public class PlayerMobTargetsData extends SavedData {
         return true;
     }
 
+    public boolean hasOverride(UUID player, EntityType<?> type) {
+        ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        return id != null && players.getOrDefault(player, Map.of()).containsKey(id);
+    }
+
     public boolean isEnabled(UUID player, EntityType<?> type) {
         ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
         if (id == null) return false;
