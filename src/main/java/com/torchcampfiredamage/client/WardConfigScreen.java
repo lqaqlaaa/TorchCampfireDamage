@@ -158,12 +158,12 @@ public class WardConfigScreen extends Screen {
         // 右列七项；窄屏时放到第二组列位置，避免两列挤压
         int rx = (columns == 2 ? rightColumnX : contentX) + labelW + 8;
         int ry = rowsTop;
-        addToggle(rx, ry, glowing, v -> glowing = v); ry += rowH;
-        addToggle(rx, ry, slow, v -> slow = v); ry += rowH;
-        addToggle(rx, ry, announce, v -> announce = v); ry += rowH;
-        addToggle(rx, ry, dropTeleport, v -> dropTeleport = v); ry += rowH;
-        addToggle(rx, ry, xpTeleport, v -> xpTeleport = v); ry += rowH;
-        addToggle(rx, ry, ignoreNamed, v -> ignoreNamed = v); ry += rowH;
+        addToggle(rx, ry, () -> glowing, v -> glowing = v); ry += rowH;
+        addToggle(rx, ry, () -> slow, v -> slow = v); ry += rowH;
+        addToggle(rx, ry, () -> announce, v -> announce = v); ry += rowH;
+        addToggle(rx, ry, () -> dropTeleport, v -> dropTeleport = v); ry += rowH;
+        addToggle(rx, ry, () -> xpTeleport, v -> xpTeleport = v); ry += rowH;
+        addToggle(rx, ry, () -> ignoreNamed, v -> ignoreNamed = v); ry += rowH;
         addRenderableWidget(Button.builder(Component.literal("攻击附魔  ›"), b ->
                 Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments())))
                 .bounds(rx, ry, controlW, controlH).build());
@@ -178,15 +178,13 @@ public class WardConfigScreen extends Screen {
                 .bounds(footerX + footerW + footerGap, footerY, footerW, 20).build());
     }
 
-    private void addToggle(int x, int y, boolean initial, java.util.function.Consumer<Boolean> setter) {
-        Button button = Button.builder(onOffText(initial), b -> {
-            boolean next = !initial;
+    private void addToggle(int x, int y, java.util.function.Supplier<Boolean> getter,
+                           java.util.function.Consumer<Boolean> setter) {
+        addRenderableWidget(Button.builder(onOffText(getter.get()), button -> {
+            boolean next = !getter.get();
             setter.accept(next);
-            b.setMessage(onOffText(next));
-            // 更新捕获值，避免下一次点击重复切换同一状态
-            b.active = true;
-        }).bounds(x, y, controlW, controlH).build();
-        addRenderableWidget(button);
+            button.setMessage(onOffText(next));
+        }).bounds(x, y, controlW, controlH).build());
     }
 
     private Component toggleText(String name, boolean on) {
