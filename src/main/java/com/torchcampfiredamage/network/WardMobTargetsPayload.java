@@ -30,7 +30,7 @@ public record WardMobTargetsPayload(BlockPos pos,int action,String entityId,bool
                 case 0 -> ward.setMobTarget(id,p.enabled());
                 case 1 -> ward.removeMobTarget(id);
                 case 2 -> ward.deleteMobTarget(id);
-                case 3 -> ward.discoverMobTarget(id);
+                case 3 -> ward.discoverMobTarget(id,p.enabled());
                 default -> {}
             }
         });
