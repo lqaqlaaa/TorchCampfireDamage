@@ -23,9 +23,12 @@ public record WardMobTargetsPayload(BlockPos pos,int action,String entityId,bool
         ctx.enqueueWork(()->{
             if(!(ctx.player() instanceof ServerPlayer player)||!(player.level() instanceof ServerLevel level))return;
             if(player.distanceToSqr(p.pos().getX()+0.5,p.pos().getY()+0.5,p.pos().getZ()+0.5)>64.0)return;
+            if(!level.hasChunkAt(p.pos()) || !level.getWorldBorder().isWithinBounds(p.pos()))return;
+            if(p.action()<0 || p.action()>3 || p.entityId()==null || p.entityId().length()>256)return;
             BlockEntity be=level.getBlockEntity(p.pos());
             if(!(be instanceof WardSourceBlockEntity ward))return;
-            ResourceLocation id=ResourceLocation.tryParse(p.entityId()); if(id==null)return;
+            ResourceLocation id=ResourceLocation.tryParse(p.entityId());
+            if(id==null || !net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.containsKey(id))return;
             switch(p.action()){
                 case 0 -> ward.setMobTarget(id,p.enabled());
                 case 1 -> ward.removeMobTarget(id);
