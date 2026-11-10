@@ -63,7 +63,7 @@ public class DamageEventHandler {
     private static final Map<Mob, Long> GLOW_EXPIRY = new HashMap<>();
     private static boolean DEBUG_PRINTED = false;
 
-    public record DropTarget(BlockPos pos, boolean drops, boolean xp, int lootingLevel) {}
+    public record DropTarget(BlockPos pos, boolean drops, boolean xp) {}
     private record WardRegion(BlockPos pos, WardSourceBlockEntity ward, AABB area) {}
 
     /* ================= 登记 ================= */
@@ -309,21 +309,20 @@ public class DamageEventHandler {
 
             if (tpDrops || tpXp) {
                 UUID id = mob.getUUID();
-                entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp, Math.max(0, lootingLevel)));
+                entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp));
                 CONSUMED.remove(id);
                 pendingCleanup.put(id, gameTime);
             }
 
             java.util.List<DamageSource> sources = buildDamageSources(level, ward);
             if (ward.getSpecialDamageTypes().contains("burn")) mob.setSecondsOnFire(5);
-            float perTypeDamage = damage / Math.max(1, sources.size());
+            // 多选表示同一次火把攻击同时应用全部已选伤害方式；每种方式均使用完整配置伤害。
+            // Minecraft 的 hurt 无敌帧会屏蔽同 tick 后续命中，因此每次伤害间重置无敌帧，
+            // 不再把伤害拆分给不同类型。
             for (DamageSource source : sources) {
                 if (!mob.isAlive()) break;
-                if (!mob.hurt(source, perTypeDamage)) {
-                    mob.invulnerableTime = 0;
-                    mob.setHealth(Math.max(0.0f, mob.getHealth() - perTypeDamage));
-                    if (mob.getHealth() <= 0.0f) mob.die(source);
-                }
+                mob.invulnerableTime = 0;
+                mob.hurt(source, damage);
             }
 
             damagedThisTick.add(mob.getUUID());
@@ -391,7 +390,7 @@ public class DamageEventHandler {
     public static void putDropTarget(UUID entityId, net.minecraft.core.BlockPos pos,
                                      boolean drops, boolean xp) {
         if (drops || xp) {
-            entityDropTargets.put(entityId, new DropTarget(pos, drops, xp, 0));
+            entityDropTargets.put(entityId, new DropTarget(pos, drops, xp));
             CONSUMED.remove(entityId);
             pendingCleanup.put(entityId, 0L);
         }
