@@ -99,25 +99,25 @@ public class GlobalSettingsScreen extends Screen {
                 () -> ModConfig.SLOW_DURATION.get(), v -> ModConfig.SLOW_DURATION.set(v)));
 
         // --- 副手火把 ---
-        allRows.add(boolRow("启用副手", "副手持火把/装备护符时是否生效",
+        allRows.add(boolRow("启用护符", "Curios 饰品栏装备护符时是否生效",
                 () -> ModConfig.OFFHAND_ENABLED.get(), v -> ModConfig.OFFHAND_ENABLED.set(v)));
-        allRows.add(intRow("副手区块半径", "伤害范围（区块），1 = 3x3 区块",
+        allRows.add(intRow("护符区块半径", "伤害范围（区块），1 = 3x3 区块",
                 () -> ModConfig.OFFHAND_CHUNK_RADIUS.get(), v -> ModConfig.OFFHAND_CHUNK_RADIUS.set(v)));
-        allRows.add(intRow("副手间隔", "tick 数，1 = 每 tick，20 = 1 秒",
+        allRows.add(intRow("护符攻击间隔", "tick 数，1 = 每 tick，20 = 1 秒",
                 () -> ModConfig.OFFHAND_INTERVAL.get(), v -> ModConfig.OFFHAND_INTERVAL.set(v)));
-        allRows.add(boolRow("固定伤害模式", "关闭：使用玩家攻击力；开启：使用下方固定伤害",
+        allRows.add(boolRow("护符固定伤害模式", "关闭：使用玩家攻击力；开启：使用下方固定伤害",
                 () -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE_MODE.set(v)));
-        allRows.add(dblRow("副手固定伤害", "仅固定伤害模式生效，2.0 = 1 颗心",
+        allRows.add(dblRow("护符固定伤害", "仅固定伤害模式生效，2.0 = 1 颗心",
                 () -> ModConfig.OFFHAND_FIXED_DAMAGE.get(), v -> ModConfig.OFFHAND_FIXED_DAMAGE.set(Math.max(0.0, Math.min(2048.0, v)))));
-        allRows.add(boolRow("副手播报", "副手击杀时是否播报",
+        allRows.add(boolRow("护符击杀播报", "副手击杀时是否播报",
                 () -> ModConfig.OFFHAND_ANNOUNCE.get(), v -> ModConfig.OFFHAND_ANNOUNCE.set(v)));
-        allRows.add(boolRow("副手发光", "被攻击目标获得发光效果",
+        allRows.add(boolRow("护符发光", "被攻击目标获得发光效果",
                 () -> ModConfig.OFFHAND_GLOWING.get(), v -> ModConfig.OFFHAND_GLOWING.set(v)));
-        allRows.add(boolRow("副手减速", "被攻击目标获得减速效果",
+        allRows.add(boolRow("护符减速", "被攻击目标获得减速效果",
                 () -> ModConfig.OFFHAND_SLOW.get(), v -> ModConfig.OFFHAND_SLOW.set(v)));
-        allRows.add(boolRow("副手传掉落", "副手击杀掉落物传送到玩家",
+        allRows.add(boolRow("护符传掉落", "副手击杀掉落物传送到玩家",
                 () -> ModConfig.OFFHAND_TELEPORT_DROPS.get(), v -> ModConfig.OFFHAND_TELEPORT_DROPS.set(v)));
-        allRows.add(boolRow("副手传经验", "副手击杀经验球传送到玩家",
+        allRows.add(boolRow("护符传经验", "副手击杀经验球传送到玩家",
                 () -> ModConfig.OFFHAND_TELEPORT_XP.get(), v -> ModConfig.OFFHAND_TELEPORT_XP.set(v)));
 
         // --- 新火把默认值 ---
@@ -240,7 +240,7 @@ public class GlobalSettingsScreen extends Screen {
         int navY = 48;
         int navButtonH = 24;
         int navGap = 5;
-        String[] tabs = {"通用设置", "副手火把", "放置火把", "生物列表"};
+        String[] tabs = {"通用设置", "饰品栏护符", "放置火把", "生物列表"};
         String[] icons = {"⚙", "⚔", "✦", "♟"};
         for (int i = 0; i < tabs.length; i++) {
             final int category = i;
