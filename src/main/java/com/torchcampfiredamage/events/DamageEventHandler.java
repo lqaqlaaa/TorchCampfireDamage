@@ -70,6 +70,7 @@ public class DamageEventHandler {
     private static boolean DEBUG_PRINTED = false;
 
     public record DropTarget(BlockPos pos, boolean drops, boolean xp, int lootingLevel) {}
+    private record WardRegion(BlockPos pos, WardSourceBlockEntity ward, AABB area) {}
 
     /* ================= 登记 ================= */
 
@@ -182,6 +183,13 @@ public class DamageEventHandler {
         Set<UUID> damagedThisTick = new HashSet<>();
         // LinkedHashSet 保留服务端登记顺序；较早登记的火把在重叠区域拥有优先权。
         List<BlockPos> snapshot = new ArrayList<>(torches);
+        List<WardRegion> orderedRegions = new ArrayList<>(snapshot.size());
+        for (BlockPos pos : snapshot) {
+            BlockEntity entity = level.getBlockEntity(pos);
+            if (entity instanceof WardSourceBlockEntity ward && ward.isEnabled()) {
+                orderedRegions.add(new WardRegion(pos, ward, damageArea(pos, ward)));
+            }
+        }
         List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
@@ -215,20 +223,18 @@ public class DamageEventHandler {
             long last = damageTimes.getOrDefault(ip, Long.MIN_VALUE / 2);
             if (gameTime - last < interval) continue;
 
-            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick, gameTime, snapshot);
+            damageHostiles(level, ip, ward, owners.get(ip), damagedThisTick, gameTime, orderedRegions);
             damageTimes.put(ip, gameTime);
         }
     }
 
 
-    private static boolean claimedByEarlierTorch(ServerLevel level, BlockPos current, Mob mob,
-                                                   List<BlockPos> orderedTorches, boolean ignoreNamed) {
-        for (BlockPos earlierPos : orderedTorches) {
-            if (earlierPos.equals(current)) return false;
-            BlockEntity earlierBe = level.getBlockEntity(earlierPos);
-            if (!(earlierBe instanceof WardSourceBlockEntity earlier) || !earlier.isEnabled()) continue;
-            if (!damageArea(earlierPos, earlier).contains(mob.position())) continue;
-            if (ignoreNamed && earlier.isIgnoreNamed() && mob.hasCustomName()) continue;
+    private static boolean claimedByEarlierTorch(BlockPos current, Mob mob, List<WardRegion> orderedRegions) {
+        for (WardRegion region : orderedRegions) {
+            if (region.pos().equals(current)) return false;
+            WardSourceBlockEntity earlier = region.ward();
+            if (!region.area().contains(mob.position())) continue;
+            if (earlier.isIgnoreNamed() && mob.hasCustomName()) continue;
             if (earlier.hasMobTargetOverride(mob.getType())) {
                 if (!earlier.isMobTargetAllowed(mob.getType())) continue;
             } else if (!isHostileToPlayers(mob)) {
@@ -242,7 +248,7 @@ public class DamageEventHandler {
     /* ================= 伤害 ================= */
 
     private static void damageHostiles(ServerLevel level, BlockPos center, WardSourceBlockEntity ward,
-                                       UUID ownerUUID, Set<UUID> damagedThisTick, long gameTime, List<BlockPos> orderedTorches) {
+                                       UUID ownerUUID, Set<UUID> damagedThisTick, long gameTime, List<WardRegion> orderedRegions) {
         AABB area = damageArea(center, ward);
         Player owner = ownerUUID == null ? null : level.getPlayerByUUID(ownerUUID);
 
@@ -271,7 +277,7 @@ public class DamageEventHandler {
             if (ignoreNamed && mob.hasCustomName()) continue;
             // 重叠区域归属：按服务端登记顺序检查更早的火把。
             // 更早火把禁用、卸载、名单排除此生物或不在范围内时，不占用归属，后续火把可接管。
-            if (claimedByEarlierTorch(level, center, mob, orderedTorches, ignoreNamed)) continue;
+            if (claimedByEarlierTorch(center, mob, orderedRegions)) continue;
             // 只有明确添加到本火把名单中的类型才覆盖默认行为。
             // 未配置的生物继续使用旧版敌对/仇恨判定，避免添加一个目标后误伤默认规则。
             if (ward.hasMobTargetOverride(mob.getType())) {
