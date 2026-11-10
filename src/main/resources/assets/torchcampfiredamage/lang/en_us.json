@@ -2,5 +2,6 @@
   "block.torchcampfiredamage.ward_torch": "Ward Torch",
   "item.torchcampfiredamage.ward_torch": "Ward Torch",
   "item.torchcampfiredamage.ward_charm": "Ward Charm",
-  "key.torchcampfiredamage.open_settings": "Open mod settings"
+  "key.torchcampfiredamage.open_settings": "Open mod settings",
+  "key.categories.torchcampfiredamage": "Ward Torch"
 }
