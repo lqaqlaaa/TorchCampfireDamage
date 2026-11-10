@@ -314,15 +314,30 @@ public class DamageEventHandler {
                 pendingCleanup.put(id, gameTime);
             }
 
-            java.util.List<DamageSource> sources = buildDamageSources(level, ward);
-            if (ward.getSpecialDamageTypes().contains("burn")) mob.setRemainingFireTicks(Math.max(mob.getRemainingFireTicks(), 100));
-            // 多选表示同一次火把攻击同时应用全部已选伤害方式；每种方式均使用完整配置伤害。
-            // Minecraft 的 hurt 无敌帧会屏蔽同 tick 后续命中，因此每次伤害间重置无敌帧，
-            // 不再把伤害拆分给不同类型。
-            for (DamageSource source : sources) {
-                if (!mob.isAlive()) break;
+            // 独立伤害方法优先执行：先压至半颗心，再交由玩家伤害来源完成死亡判定。
+            if (ward.isForceOneHealth()) {
+                float originalHealth = mob.getHealth();
+                mob.setHealth(1.0F);
                 mob.invulnerableTime = 0;
-                mob.hurt(source, damage);
+                boolean killed = mob.hurt(src, Math.max(1.0F, damage));
+                if (!killed && mob.isAlive()) {
+                    // 伤害被取消或拒绝时回滚，避免目标无故永久只剩 1 HP。
+                    mob.setHealth(originalHealth);
+                }
+            }
+
+            // 独立方法执行后，再处理所有选中的特殊伤害类型。
+            // 目标若已死亡，后续 hurt 无法继续命中；持续燃烧也只对存活目标施加。
+            if (mob.isAlive()) {
+                java.util.List<DamageSource> sources = buildDamageSources(level, ward);
+                if (ward.getSpecialDamageTypes().contains("burn")) {
+                    mob.setRemainingFireTicks(Math.max(mob.getRemainingFireTicks(), 100));
+                }
+                for (DamageSource source : sources) {
+                    if (!mob.isAlive()) break;
+                    mob.invulnerableTime = 0;
+                    mob.hurt(source, damage);
+                }
             }
 
             damagedThisTick.add(mob.getUUID());
