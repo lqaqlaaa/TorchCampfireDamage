@@ -278,13 +278,17 @@ public class GlobalSettingsScreen extends Screen {
         // 顶部分类导航：让设置归属一眼可见
         int tabY = 30;
         int tabGap = 4;
-        int tabW = Math.max(54, Math.min(104, (this.width - 24 - tabGap * 2) / 3));
-        int tabX = (this.width - (tabW * 3 + tabGap * 2)) / 2;
-        String[] tabs = {"全局规则", "副手火把", "新火把默认值"};
+        int tabW = Math.max(48, Math.min(104, (this.width - 24 - tabGap * 3) / 4));
+        int tabX = (this.width - (tabW * 4 + tabGap * 3)) / 2;
+        String[] tabs = {"全局规则", "副手火把", "新火把", "生物列表"};
         for (int i = 0; i < tabs.length; i++) {
             final int category = i;
             Component label = Component.literal((activeCategory == i ? "§e▶ " : "") + tabs[i]);
             addRenderableWidget(Button.builder(label, b -> {
+                if (category == 3) {
+                    minecraft.setScreen(new MobTargetsScreen(this));
+                    return;
+                }
                 activeCategory = category;
                 page = 0;
                 init();
