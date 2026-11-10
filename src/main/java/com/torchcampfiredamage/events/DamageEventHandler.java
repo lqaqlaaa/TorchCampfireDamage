@@ -237,8 +237,13 @@ public class DamageEventHandler {
         for (Mob mob : candidates) {
             if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
-            if (!ward.isMobTargetAllowed(mob.getType())) continue;
-            if (!isHostileToPlayers(mob)) continue;
+            // 只有明确添加到本火把名单中的类型才覆盖默认行为。
+            // 未配置的生物继续使用旧版敌对/仇恨判定，避免添加一个目标后误伤默认规则。
+            if (ward.hasMobTargetOverride(mob.getType())) {
+                if (!ward.isMobTargetAllowed(mob.getType())) continue;
+            } else if (!isHostileToPlayers(mob)) {
+                continue;
+            }
 
             if (glowing) {
                 mob.setGlowingTag(true);
