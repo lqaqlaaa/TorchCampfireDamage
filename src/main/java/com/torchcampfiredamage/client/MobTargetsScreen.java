@@ -9,6 +9,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -41,29 +42,33 @@ public final class MobTargetsScreen extends Screen {
         clearWidgets();
         if (!requested) { requested = true; requestList(); }
 
+        List<PlayerMobTargetsSyncPayload.Entry> entries = displayEntries();
         int start = page * rowsPerPage;
-        int end = Math.min(targets.size(), start + rowsPerPage);
+        int end = Math.min(entries.size(), start + rowsPerPage);
         int rowHeight = 26;
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
 
         for (int i = start; i < end; i++) {
-            PlayerMobTargetsSyncPayload.Entry entry = targets.get(i);
+            PlayerMobTargetsSyncPayload.Entry entry = entries.get(i);
             int y = listTop + (i - start) * rowHeight;
             int right = left + listWidth;
             int toggleW = 54;
             int deleteW = 42;
             int toggleX = right - deleteW - toggleW - 8;
             int deleteX = right - deleteW;
+            boolean configured = isConfigured(entry.entityId());
 
             addRenderableWidget(Button.builder(
-                    Component.literal(entry.enabled() ? "§a开启" : "§c关闭"),
-                    button -> send(ACTION_SET, entry.entityId(), !entry.enabled()))
+                    Component.literal(configured ? (entry.enabled() ? "§a开启" : "§c关闭") : "添加"),
+                    button -> send(ACTION_SET, entry.entityId(), configured ? !entry.enabled() : true))
                     .bounds(toggleX, y + 2, toggleW, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("删除"),
-                    button -> send(ACTION_REMOVE, entry.entityId(), false))
-                    .bounds(deleteX, y + 2, deleteW, 20).build());
+            if (configured) {
+                addRenderableWidget(Button.builder(Component.literal("删除"),
+                        button -> send(ACTION_REMOVE, entry.entityId(), false))
+                        .bounds(deleteX, y + 2, deleteW, 20).build());
+            }
         }
 
         // 底部按钮按固定间距排列，避免刷新按钮与上一页按钮重叠。
@@ -82,8 +87,28 @@ public final class MobTargetsScreen extends Screen {
                 .bounds(controlsLeft + 128, controlsY, 56, 20).build());
     }
 
+    private boolean isConfigured(String entityId) {
+        return targets.stream().anyMatch(entry -> entry.entityId().equals(entityId));
+    }
+
+    /** 合并客户端注册表中的全部 Mob 类型与服务端已保存条目，未添加的也可直接添加。 */
+    private List<PlayerMobTargetsSyncPayload.Entry> displayEntries() {
+        java.util.Map<ResourceLocation, PlayerMobTargetsSyncPayload.Entry> all = new java.util.TreeMap<>();
+        for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
+            if (type.getCategory() == MobCategory.MISC) continue;
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
+            if (id != null) all.put(id, new PlayerMobTargetsSyncPayload.Entry(id.toString(), false));
+        }
+        for (PlayerMobTargetsSyncPayload.Entry entry : targets) {
+            ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
+            if (id != null) all.put(id, entry);
+        }
+        return new ArrayList<>(all.values());
+    }
+
     private int pageCount() {
-        return Math.max(1, (targets.size() + Math.max(1, rowsPerPage) - 1) / Math.max(1, rowsPerPage));
+        int size = displayEntries().size();
+        return Math.max(1, (size + Math.max(1, rowsPerPage) - 1) / Math.max(1, rowsPerPage));
     }
 
     private void requestList() {
@@ -107,7 +132,7 @@ public final class MobTargetsScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawCenteredString(font, "玩家生物列表", width / 2, 10, 0xFFD700);
-        graphics.drawCenteredString(font, "攻击生物后自动收录；开关会同时影响方块火把和副手/护符",
+        graphics.drawCenteredString(font, "直接从已安装生物中添加；此名单只影响副手火把/护符",
                 width / 2, 24, 0xAAAAAA);
 
         int pageCount = pageCount();
@@ -118,24 +143,26 @@ public final class MobTargetsScreen extends Screen {
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
+        List<PlayerMobTargetsSyncPayload.Entry> entries = displayEntries();
         int start = page * rowsPerPage;
-        int end = Math.min(targets.size(), start + rowsPerPage);
+        int end = Math.min(entries.size(), start + rowsPerPage);
 
-        if (targets.isEmpty()) {
-            graphics.drawCenteredString(font, "列表为空。主动攻击生物并造成伤害后，它会自动出现在这里。",
-                    width / 2, height / 2 - 8, 0xBBBBBB);
+        if (entries.isEmpty()) {
+            graphics.drawCenteredString(font, "当前没有可用的生物类型。", width / 2, height / 2 - 8, 0xBBBBBB);
         }
 
         for (int i = start; i < end; i++) {
-            PlayerMobTargetsSyncPayload.Entry entry = targets.get(i);
+            PlayerMobTargetsSyncPayload.Entry entry = entries.get(i);
             int y = listTop + (i - start) * rowHeight;
             graphics.fill(left, y, left + listWidth, y + 24, 0x66333333);
 
             ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
             EntityType<?> type = id == null ? null : BuiltInRegistries.ENTITY_TYPE.getOptional(id).orElse(null);
+            boolean configured = isConfigured(entry.entityId());
             String displayName = type == null ? entry.entityId() + "（未安装）" : type.getDescription().getString();
+            String state = configured ? (entry.enabled() ? "已启用" : "已停用") : "未添加";
             int nameMax = Math.max(20, listWidth - 150);
-            graphics.drawString(font, font.plainSubstrByWidth(displayName, nameMax), left + 8, y + 5,
+            graphics.drawString(font, font.plainSubstrByWidth(displayName + " · " + state, nameMax), left + 8, y + 5,
                     type == null ? 0xFF7777 : 0xFFFFFF);
             graphics.drawString(font, entry.entityId(), left + 8, y + 15, 0x888888);
         }
