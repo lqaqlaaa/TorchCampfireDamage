@@ -16,7 +16,7 @@ import java.util.*;
 public class PlayerMobTargetsData extends SavedData {
     private static final String DATA_NAME = "torchcampfiredamage_player_mob_targets";
     private final Map<UUID, Map<ResourceLocation, Boolean>> players = new HashMap<>();
-    private final Map<UUID, Set<ResourceLocation>> discovered = new HashMap<>();
+    private final Map<UUID, Map<ResourceLocation, Boolean>> discovered = new HashMap<>();
 
     public static PlayerMobTargetsData get(MinecraftServer server) {
         ServerLevel overworld = server.overworld();
@@ -39,11 +39,11 @@ public class PlayerMobTargetsData extends SavedData {
                 if (id != null) targets.put(id, e.getBoolean("Enabled"));
             }
             data.players.put(uuid, targets);
-            Set<ResourceLocation> seen = new HashSet<>();
+            Map<ResourceLocation, Boolean> seen = new HashMap<>();
             ListTag seenList = pt.getList("Discovered", CompoundTag.TAG_COMPOUND);
             for (int j = 0; j < seenList.size(); j++) {
                 ResourceLocation id = ResourceLocation.tryParse(seenList.getCompound(j).getString("Id"));
-                if (id != null) seen.add(id);
+                if (id != null) seen.put(id, seenList.getCompound(j).getBoolean("Enabled"));
             }
             data.discovered.put(uuid, seen);
         }
@@ -66,7 +66,7 @@ public class PlayerMobTargetsData extends SavedData {
             }
             pt.put("Targets", entries);
             ListTag seen = new ListTag();
-            for (ResourceLocation id : discovered.getOrDefault(uuid, Set.of())) {
+            for (var seenEntry : discovered.getOrDefault(uuid, Map.of()).entrySet()) {
                 CompoundTag item = new CompoundTag();
                 item.putString("Id", id.toString());
                 seen.add(item);
@@ -84,7 +84,7 @@ public class PlayerMobTargetsData extends SavedData {
     }
     public boolean discover(UUID player, ResourceLocation id) {
         if (id == null) return false;
-        boolean added = discovered.computeIfAbsent(player, k -> new HashSet<>()).add(id);
+        boolean added = discovered.computeIfAbsent(player, k -> new HashMap<>()).put(id, enabled);
         if (added) setDirty();
         return added;
     }
@@ -109,7 +109,7 @@ public class PlayerMobTargetsData extends SavedData {
     }
     public Map<ResourceLocation, Boolean> getEntries(UUID player) {
         Map<ResourceLocation, Boolean> result = new TreeMap<>();
-        for (ResourceLocation id : discovered.getOrDefault(player, Set.of())) result.put(id, false);
+        result.putAll(discovered.getOrDefault(player, Map.of()));
         result.putAll(players.getOrDefault(player, Map.of()));
         return Collections.unmodifiableMap(result);
     }
