@@ -3,7 +3,6 @@ package com.torchcampfiredamage.client;
 import com.torchcampfiredamage.TorchCampfireDamage;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -17,7 +16,7 @@ public final class ModKeyMappings {
             "key.torchcampfiredamage.open_settings",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_O,
-            Component.translatable("key.categories.misc")
+            "key.categories.misc"
     );
 
     private ModKeyMappings() {}
