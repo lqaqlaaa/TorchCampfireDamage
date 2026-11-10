@@ -197,6 +197,7 @@ public final class MobTargetsScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(graphics, this.width, this.height);
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, "副手火把 / 护符 · 附近生物", width / 2, 10, 0xFFD700);
         graphics.drawCenteredString(font, "扫描副手攻击范围；敌对/仇恨生物默认开启，其他生物默认关闭",
