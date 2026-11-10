@@ -38,6 +38,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean ignoreNamed = true;
     /** 本方块独立的攻击生物名单；空名单表示沿用默认行为（攻击所有敌对生物）。 */
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
+    /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
+    private final java.util.Set<net.minecraft.resources.ResourceLocation> discoveredMobTargets = new java.util.TreeSet<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -169,6 +171,19 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isTeleportXp() { return teleportXp; }
     public boolean isIgnoreNamed() { return ignoreNamed; }
     public void setIgnoreNamed(boolean v) { this.ignoreNamed = v; setChanged(); }
+
+    public java.util.Set<net.minecraft.resources.ResourceLocation> getDiscoveredMobTargets() {
+        return java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(discoveredMobTargets));
+    }
+    public void discoverMobTarget(net.minecraft.resources.ResourceLocation id) {
+        if (id != null && discoveredMobTargets.add(id)) { setChanged(); sync(); }
+    }
+    public void deleteMobTarget(net.minecraft.resources.ResourceLocation id) {
+        if (id == null) return;
+        boolean changed = discoveredMobTargets.remove(id);
+        changed |= mobTargets.remove(id) != null;
+        if (changed) { setChanged(); sync(); }
+    }
 
     public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getMobTargets() {
         return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(mobTargets));
@@ -372,6 +387,9 @@ public class WardSourceBlockEntity extends BlockEntity {
             mobTargetList.add(target);
         }
         tag.put("mobTargets", mobTargetList);
+        net.minecraft.nbt.ListTag discoveredList = new net.minecraft.nbt.ListTag();
+        for (var id : discoveredMobTargets) discoveredList.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
+        tag.put("discoveredMobTargets", discoveredList);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -427,6 +445,16 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (id != null) mobTargets.put(id, target.getBoolean("Enabled"));
             }
         }
+        discoveredMobTargets.clear();
+        if (tag.contains("discoveredMobTargets", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag discovered = tag.getList("discoveredMobTargets", Tag.TAG_STRING);
+            for (int i=0;i<discovered.size();i++) {
+                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(discovered.getString(i));
+                if (id != null) discoveredMobTargets.add(id);
+            }
+        }
+        // 旧版存档中的显式配置也视为已发现，避免升级后列表项目消失。
+        discoveredMobTargets.addAll(mobTargets.keySet());
         if (tag.contains("ignoreNamed")) {
             ignoreNamed = tag.getBoolean("ignoreNamed");
         } else {
