@@ -275,7 +275,7 @@ public final class MobTargetsScreen extends Screen {
         try {
             preview.setNoAi(true);
             InventoryScreen.renderEntityInInventoryFollowsAngle(graphics, x + 8, y + 24,
-                    x + boxW - 8, y + boxH - 8, scale, 0.0F, 0.0F, 0.0F, preview);
+                    x + boxW - 8, y + boxH - 8, Math.max(1, Math.round(scale)), 0.0F, 0.0F, 0.0F, preview);
         } catch (Throwable ignored) { }
     }
 
