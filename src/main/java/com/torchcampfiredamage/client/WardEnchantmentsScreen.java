@@ -44,6 +44,8 @@ public final class WardEnchantmentsScreen extends Screen {
     private final List<net.minecraft.client.gui.components.AbstractWidget> rowWidgets = new ArrayList<>();
     private EditBox search;
     private int page;
+    /** false=可添加，true=已添加；两个列表互斥显示。 */
+    private boolean showConfigured;
     private String status = "打开界面时会自动扫描背包中的所有附魔书";
 
     public WardEnchantmentsScreen(Screen parent, net.minecraft.core.BlockPos pos, Map<ResourceLocation, Integer> current) {
@@ -57,8 +59,13 @@ public final class WardEnchantmentsScreen extends Screen {
     private List<ResourceLocation> filtered() {
         String query = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
         List<ResourceLocation> ids = new ArrayList<>();
-        for (ResourceLocation id : candidates.keySet()) if (!ids.contains(id)) ids.add(id);
-        for (ResourceLocation id : configured.keySet()) if (!ids.contains(id)) ids.add(id);
+        if (showConfigured) {
+            ids.addAll(configured.keySet());
+        } else {
+            for (ResourceLocation id : candidates.keySet()) {
+                if (!configured.containsKey(id)) ids.add(id);
+            }
+        }
         ids.sort(Comparator.comparing(this::displayName, String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(ResourceLocation::toString));
         if (!query.isEmpty()) ids.removeIf(id ->
@@ -91,7 +98,7 @@ public final class WardEnchantmentsScreen extends Screen {
         int gap = 4;
         int scanY = compact ? 54 : 30;
         int searchW = compact ? panelWidth : Math.max(40, panelWidth - 190);
-        search = new EditBox(font, panelLeft, 30, searchW, 20, Component.literal("搜索已导入附魔"));
+        search = new EditBox(font, panelLeft, 30, searchW, 20, Component.literal("搜索附魔"));
         search.setHint(Component.literal("搜索附魔名称"));
         search.setResponder(value -> { page = 0; rebuildRows(); });
         addRenderableWidget(search);
@@ -104,6 +111,16 @@ public final class WardEnchantmentsScreen extends Screen {
                 .bounds(scanX, scanY, scanW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("全部添加"), b -> addAllCandidates())
                 .bounds(bulkX, scanY, bulkW, 20).build());
+
+        int tabY = statusY - 20;
+        int tabGap = 4;
+        int tabW = (panelWidth - tabGap) / 2;
+        addRenderableWidget(Button.builder(Component.literal("可添加 (" + candidates.keySet().stream().filter(id -> !configured.containsKey(id)).count() + ")"), b -> {
+            showConfigured = false; page = 0; rebuildRows();
+        }).bounds(panelLeft, tabY, tabW, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("已添加 (" + configured.size() + ")"), b -> {
+            showConfigured = true; page = 0; rebuildRows();
+        }).bounds(panelLeft + tabW + tabGap, tabY, tabW, 18).build());
 
         int buttonW = Math.max(34, Math.min(64, (panelWidth - 12) / 4));
         int footerGap = 4;
@@ -146,7 +163,7 @@ public final class WardEnchantmentsScreen extends Screen {
             return;
         }
         int count = 0;
-        for (Map.Entry<ResourceLocation, Integer> entry : candidates.entrySet()) {
+        for (Map.Entry<ResourceLocation, Integer> entry : candidates.entrySet()) {\n            if (configured.containsKey(entry.getKey())) continue;
             ResourceLocation id = entry.getKey();
             int level = Math.max(1, entry.getValue());
             configured.put(id, level);
@@ -227,11 +244,11 @@ public final class WardEnchantmentsScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(font, "守卫火把", 14, 10, 0xFF70AEFF, false);
         graphics.drawCenteredString(font, "放置火把 · 攻击附魔", width / 2, 10, GuiLayout.TEXT);
-        graphics.drawString(font, "自动扫描背包附魔书 · 支持一次性全部添加 · 不消耗物品", panelLeft, statusY, 0xCCCCCC);
+        graphics.drawString(font, showConfigured ? "当前火把已添加的附魔" : "从背包附魔书中选择尚未添加的附魔", panelLeft, statusY, 0xCCCCCC);
         graphics.drawString(font, status, panelLeft, statusY + 12, 0x88CCFF);
         List<ResourceLocation> ids = filtered();
         int pageCount = Math.max(1, (ids.size() + rowsPerPage - 1) / rowsPerPage);
-        graphics.drawString(font, "候选 " + candidates.size() + " 种 · 当前火把已配置 " + configured.size()
+        graphics.drawString(font, "可添加 " + candidates.keySet().stream().filter(id -> !configured.containsKey(id)).count() + " 种 · 已添加 " + configured.size()
                 + " 种 · 第 " + (page + 1) + " / " + pageCount + " 页",
                 panelLeft, statusY - 12, 0xFFFFFF);
         for (int row = 0; row < rowsPerPage && page * rowsPerPage + row < ids.size(); row++) {
@@ -243,7 +260,7 @@ public final class WardEnchantmentsScreen extends Screen {
             Integer bookLevel = candidates.get(id);
             Integer current = configured.get(id);
             graphics.drawString(font, font.plainSubstrByWidth(displayName(id), Math.max(30, panelWidth - 195)),
-                    panelLeft + 5, y + 3, current == null ? 0xFFFFFF : 0x55FF77);
+                    panelLeft + 5, y + 3, showConfigured ? 0x55FF77 : 0xFFFFFF);
             String detail = bookLevel == null ? "已配置 · 当前等级 " + current
                     : "附魔书等级 " + bookLevel + (current == null ? " · 尚未添加" : " · 当前火把等级 " + current);
             graphics.drawString(font, font.plainSubstrByWidth(detail, Math.max(30, panelWidth - 195)),
