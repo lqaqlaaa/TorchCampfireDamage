@@ -36,6 +36,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     private boolean teleportXp = true;
     /** 是否忽略被命名的生物（白名单保护），本火把独立开关 */
     private boolean ignoreNamed = true;
+    /** 本方块独立的攻击生物名单；空名单表示沿用默认行为（攻击所有敌对生物）。 */
+    private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -167,6 +169,31 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isTeleportXp() { return teleportXp; }
     public boolean isIgnoreNamed() { return ignoreNamed; }
     public void setIgnoreNamed(boolean v) { this.ignoreNamed = v; setChanged(); }
+
+    public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getMobTargets() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(mobTargets));
+    }
+
+    public boolean isMobTargetAllowed(net.minecraft.world.entity.EntityType<?> type) {
+        net.minecraft.resources.ResourceLocation id =
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        if (id == null || mobTargets.isEmpty()) return true;
+        return mobTargets.getOrDefault(id, false);
+    }
+
+    public void setMobTarget(net.minecraft.resources.ResourceLocation id, boolean enabled) {
+        if (id == null) return;
+        mobTargets.put(id, enabled);
+        setChanged();
+        sync();
+    }
+
+    public void removeMobTarget(net.minecraft.resources.ResourceLocation id) {
+        if (id != null && mobTargets.remove(id) != null) {
+            setChanged();
+            sync();
+        }
+    }
 
     /**
      * 放置时用配置文件里的「默认参数」初始化本方块。
@@ -327,6 +354,14 @@ public class WardSourceBlockEntity extends BlockEntity {
         tag.putBoolean("teleportDrops", teleportDrops);
         tag.putBoolean("teleportXp", teleportXp);
         tag.putBoolean("ignoreNamed", ignoreNamed);
+        net.minecraft.nbt.ListTag mobTargetList = new net.minecraft.nbt.ListTag();
+        for (var entry : mobTargets.entrySet()) {
+            CompoundTag target = new CompoundTag();
+            target.putString("Id", entry.getKey().toString());
+            target.putBoolean("Enabled", entry.getValue());
+            mobTargetList.add(target);
+        }
+        tag.put("mobTargets", mobTargetList);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -372,6 +407,16 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (tag.contains("teleportDrops")) teleportDrops = tag.getBoolean("teleportDrops");
         if (tag.contains("teleportXp")) teleportXp = tag.getBoolean("teleportXp");
         // 旧存档没有这个字段时，回落到全局配置
+        mobTargets.clear();
+        if (tag.contains("mobTargets", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag targets = tag.getList("mobTargets", Tag.TAG_COMPOUND);
+            for (int i = 0; i < targets.size(); i++) {
+                CompoundTag target = targets.getCompound(i);
+                net.minecraft.resources.ResourceLocation id =
+                        net.minecraft.resources.ResourceLocation.tryParse(target.getString("Id"));
+                if (id != null) mobTargets.put(id, target.getBoolean("Enabled"));
+            }
+        }
         if (tag.contains("ignoreNamed")) {
             ignoreNamed = tag.getBoolean("ignoreNamed");
         } else {
