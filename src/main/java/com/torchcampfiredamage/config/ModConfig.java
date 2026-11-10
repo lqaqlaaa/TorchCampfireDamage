@@ -41,6 +41,8 @@ public class ModConfig {
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_ENABLED;
     public static final ModConfigSpec.ConfigValue<Integer> OFFHAND_CHUNK_RADIUS;
     public static final ModConfigSpec.ConfigValue<Integer> OFFHAND_INTERVAL;
+    public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_FIXED_DAMAGE_MODE;
+    public static final ModConfigSpec.ConfigValue<Double> OFFHAND_FIXED_DAMAGE;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_ANNOUNCE;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_GLOWING;
     public static final ModConfigSpec.ConfigValue<Boolean> OFFHAND_SLOW;
@@ -146,6 +148,14 @@ public class ModConfig {
         OFFHAND_INTERVAL = builder
                 .comment("副手火把的伤害间隔（tick，1 = 每 tick，建议 5~10 降低卡顿）")
                 .defineInRange("interval", 5, 1, Integer.MAX_VALUE);
+
+        OFFHAND_FIXED_DAMAGE_MODE = builder
+                .comment("副手伤害模式：false = 玩家攻击力，true = 固定伤害")
+                .define("fixedDamageMode", false);
+
+        OFFHAND_FIXED_DAMAGE = builder
+                .comment("副手固定伤害（2.0 = 1颗心）")
+                .defineInRange("fixedDamage", 2.0, 0.0, 2048.0);
 
         OFFHAND_ANNOUNCE = builder.comment("副手火把是否播报").define("announce", false);
         OFFHAND_GLOWING = builder.comment("副手火把是否发光").define("glowing", false);
