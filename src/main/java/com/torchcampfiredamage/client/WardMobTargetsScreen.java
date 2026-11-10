@@ -1,32 +1,42 @@
 package com.torchcampfiredamage.client;
 
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
+import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.network.WardMobTargetsPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
 
-/** 单根方块火把的攻击生物名单。 */
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+/** 单根方块火把攻击范围内的生物名单。 */
 public class WardMobTargetsScreen extends Screen {
     private static final int ROWS = 8;
     private final Screen parent;
-    private final net.minecraft.core.BlockPos pos;
+    private final BlockPos pos;
     private final Map<ResourceLocation, Boolean> targets = new TreeMap<>();
     private EditBox search;
     private int scroll;
     private final List<Button> rowButtons = new ArrayList<>();
 
-    private record MobEntry(ResourceLocation id, String name, boolean installed) {}
+    private record MobEntry(ResourceLocation id, String name, boolean enabled, boolean configured) {}
 
     public WardMobTargetsScreen(Screen parent, WardSourceBlockEntity ward) {
         super(Component.literal("攻击生物名单"));
@@ -36,42 +46,76 @@ public class WardMobTargetsScreen extends Screen {
     }
 
     private List<MobEntry> filteredEntries() {
-        Map<ResourceLocation, MobEntry> all = new TreeMap<>();
-        for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
-            if (type.getCategory() == MobCategory.MISC) continue;
-            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
-            if (id == null) continue;
-            all.put(id, new MobEntry(id, type.getDescription().getString(), true));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return List.of();
+        BlockEntity raw = mc.level.getBlockEntity(pos);
+        if (!(raw instanceof WardSourceBlockEntity ward)) return List.of();
+
+        AABB area;
+        if (ward.isChunkMode()) {
+            int r = ward.getChunkRadius();
+            int cx = SectionPos.blockToSectionCoord(pos.getX());
+            int cz = SectionPos.blockToSectionCoord(pos.getZ());
+            area = new AABB((double)(cx-r)*16, pos.getY()-64, (double)(cz-r)*16,
+                    (double)(cx+r+1)*16, pos.getY()+64, (double)(cz+r+1)*16);
+        } else {
+            double r = ward.getBlockRadius() + 0.5;
+            double y = Math.min(r, 64);
+            area = AABB.ofSize(Vec3.atCenterOf(pos), r*2, y*2, r*2);
         }
-        // 不认识的 ID 也显示出来，绝不因为模组缺失而丢掉存档数据。
-        for (ResourceLocation id : targets.keySet()) {
-            all.putIfAbsent(id, new MobEntry(id, id.toString(), false));
+
+        Map<ResourceLocation, Mob> nearby = new TreeMap<>();
+        for (Mob mob : mc.level.getEntitiesOfClass(Mob.class, area)) {
+            if (!mob.isAlive()) continue;
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+            if (id != null) nearby.putIfAbsent(id, mob);
         }
+
         String q = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
-        return all.values().stream()
-                .filter(e -> q.isEmpty() || e.id().toString().toLowerCase(Locale.ROOT).contains(q)
-                        || e.name().toLowerCase(Locale.ROOT).contains(q))
-                .toList();
+        List<MobEntry> result = new ArrayList<>();
+        for (var entry : nearby.entrySet()) {
+            ResourceLocation id = entry.getKey();
+            Mob mob = entry.getValue();
+            boolean configured = targets.containsKey(id);
+            boolean defaultEnabled = isHostile(mob);
+            boolean enabled = configured ? targets.get(id) : defaultEnabled;
+            String name = mob.getType().getDescription().getString();
+            if (q.isEmpty() || id.toString().toLowerCase(Locale.ROOT).contains(q)
+                    || name.toLowerCase(Locale.ROOT).contains(q)) {
+                result.add(new MobEntry(id, name, enabled, configured));
+            }
+        }
+        return result;
+    }
+
+    private boolean isHostile(Mob mob) {
+        if (mob instanceof Enemy) return true;
+        boolean provoked = false;
+        try { provoked = ModConfig.TREAT_PROVOKED_AS_HOSTILE.get(); } catch (Throwable ignored) {}
+        if (!provoked) return false;
+        LivingEntity target = mob.getTarget();
+        if (target instanceof Player) return true;
+        return target instanceof TamableAnimal tameable && tameable.getOwner() != null;
     }
 
     @Override
     protected void init() {
         int panelWidth = Math.min(390, this.width - 20);
         int left = (this.width - panelWidth) / 2;
-        search = new EditBox(this.font, left, 28, panelWidth, 20, Component.literal("搜索生物名称或 ID"));
-        search.setHint(Component.literal("搜索生物名称或 modid:entity"));
-        search.setResponder(value -> {
-            scroll = 0;
-            rebuildRows();
-        });
+        search = new EditBox(this.font, left, 28, panelWidth, 20, Component.literal("搜索当前范围内的生物"));
+        search.setHint(Component.literal("搜索名称或 modid:entity"));
+        search.setResponder(value -> { scroll = 0; rebuildRows(); });
         addRenderableWidget(search);
         rebuildRows();
+        addRenderableWidget(Button.builder(Component.literal("刷新"), b -> {
+            scroll = 0;
+            rebuildRows();
+        }).bounds(this.width / 2 - 88, this.height - 28, 56, 20).build());
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
-                .bounds(this.width / 2 - 42, this.height - 28, 84, 20).build());
+                .bounds(this.width / 2 + 8, this.height - 28, 80, 20).build());
     }
 
     private void rebuildRows() {
-        // 只重建列表操作按钮，搜索框和返回按钮保持不动。
         for (Button button : rowButtons) removeWidget(button);
         rowButtons.clear();
 
@@ -85,17 +129,16 @@ public class WardMobTargetsScreen extends Screen {
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             int y = top + row * rowHeight;
-            Boolean enabled = targets.get(entry.id());
-            int labelWidth = panelWidth - 116;
-            if (enabled == null) {
-                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("添加"), b -> change(entry.id(), true))
-                        .bounds(left + labelWidth + 4, y, 52, 20).build()));
-            } else {
-                rowButtons.add(addRenderableWidget(Button.builder(Component.literal(enabled ? "停用" : "启用"),
-                                b -> change(entry.id(), !enabled))
-                        .bounds(left + labelWidth + 4, y, 52, 20).build()));
-                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(entry.id()))
-                        .bounds(left + labelWidth + 60, y, 52, 20).build()));
+            int toggleX = left + panelWidth - 108;
+            int resetX = left + panelWidth - 52;
+            rowButtons.add(addRenderableWidget(Button.builder(
+                            Component.literal(entry.enabled() ? "§a开启" : "§c关闭"),
+                            b -> change(entry.id(), !entry.enabled()))
+                    .bounds(toggleX, y, 52, 20).build()));
+            if (entry.configured()) {
+                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("默认"),
+                                b -> remove(entry.id()))
+                        .bounds(resetX, y, 48, 20).build()));
             }
         }
     }
@@ -115,7 +158,7 @@ public class WardMobTargetsScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int max = Math.max(0, filteredEntries().size() - ROWS);
-        scroll = Math.max(0, Math.min(max, scroll - (int) Math.signum(scrollY) * 3));
+        scroll = Math.max(0, Math.min(max, scroll - (int)Math.signum(scrollY) * 3));
         rebuildRows();
         return true;
     }
@@ -124,21 +167,25 @@ public class WardMobTargetsScreen extends Screen {
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
         super.render(gg, mouseX, mouseY, partialTick);
-        gg.drawCenteredString(font, "攻击生物名单", width / 2, 10, 0xFFFFFF);
-        gg.drawString(font, "点击添加；已添加的生物可启用、停用或移除", 12, height - 42, 0xAAAAAA);
-        gg.drawString(font, "未添加的生物沿用敌对/仇恨规则；名单只覆盖已配置的生物", 12, height - 54, 0xAAAAAA);
+        gg.drawCenteredString(font, "地下火把 · 攻击范围内的生物", width / 2, 10, 0xFFFFFF);
+        gg.drawCenteredString(font, "敌对/仇恨生物默认开启，其他生物默认关闭；可单独切换",
+                width / 2, 20, 0xAAAAAA);
         List<MobEntry> entries = filteredEntries();
-        gg.drawString(font, "生物类型: " + entries.size() + "    滚轮翻页", 12, 53, 0x888888);
+        gg.drawString(font, "当前范围内 " + entries.size() + " 种生物 · 滚轮翻页", 12, 53, 0x888888);
         int panelWidth = Math.min(390, this.width - 20);
         int left = (this.width - panelWidth) / 2;
+        if (entries.isEmpty()) {
+            gg.drawCenteredString(font, "攻击范围内暂时没有生物，点击刷新重新扫描。",
+                    width / 2, height / 2, 0xBBBBBB);
+        }
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
-            Boolean enabled = targets.get(entry.id());
-            String state = enabled == null ? "默认规则" : (enabled ? "强制允许" : "强制停用");
-            String suffix = entry.installed() ? state : "未安装";
-            String label = font.plainSubstrByWidth(entry.name() + " [" + entry.id() + "] · " + suffix,
-                    panelWidth - 122);
-            gg.drawString(font, label, left, 64 + row * 25 + 6, entry.installed() ? 0xFFFFFF : 0xFF7777);
+            int y = 58 + row * 25;
+            String state = entry.enabled() ? "开启" : "关闭";
+            if (!entry.configured()) state += "（默认）";
+            String label = font.plainSubstrByWidth(entry.name() + " · " + state, panelWidth - 122);
+            gg.drawString(font, label, left + 4, y + 6, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
+            gg.drawString(font, entry.id().toString(), left + 4, y + 15, 0x888888);
         }
     }
 
