@@ -12,7 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** 单根放置火把的附魔配置：action 0=设置等级，1=移除。 */
+/** 单根放置火把的伤害类型配置：action 2=启用/禁用类型。 */
 public record WardEnchantmentsPayload(BlockPos pos, int action, String enchantmentId, int level)
         implements CustomPacketPayload {
     public static final Type<WardEnchantmentsPayload> TYPE = new Type<>(
@@ -38,13 +38,8 @@ public record WardEnchantmentsPayload(BlockPos pos, int action, String enchantme
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64.0) return;
             BlockEntity raw = level.getBlockEntity(pos);
             if (!(raw instanceof WardSourceBlockEntity ward)) return;
-            ResourceLocation id = ResourceLocation.tryParse(payload.enchantmentId());
-            if (id == null || !level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT).containsKey(id)) return;
-            if (payload.action() == 0 && payload.level() > 0) {
-                ward.setAttackEnchantment(id, payload.level());
-            } else if (payload.action() == 1) {
-                ward.removeAttackEnchantment(id);
-            }
+            if (payload.action() != 2 || payload.enchantmentId().length() > 32) return;
+            ward.setSpecialDamageType(payload.enchantmentId(), payload.level() > 0);
         });
     }
 }
