@@ -222,7 +222,9 @@ public final class MobTargetsScreen extends Screen {
             if (mouseX >= left + 4 && mouseX <= left + 32 && mouseY >= y + 16 && mouseY <= y + 42) {
                 hoveredId = ResourceLocation.tryParse(entry.entityId());
             }
-            graphics.fill(left, y + 17, left + listWidth, y + 42, 0x66333333);
+            graphics.fill(left, y + 15, left + listWidth, y + 43, 0xFF172438);
+            graphics.fill(left, y + 15, left + 2, y + 43, GuiLayout.ACCENT);
+            graphics.renderOutline(left, y + 15, listWidth, 28, GuiLayout.BORDER);
             ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
             String name = id == null ? entry.entityId()
                     : BuiltInRegistries.ENTITY_TYPE.getOptional(id)
@@ -243,7 +245,7 @@ public final class MobTargetsScreen extends Screen {
                     left + 38, y + 23, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             graphics.drawString(font, entry.entityId(), left + 38, y + 33, 0x888888);
         }
-        if (hoveredId != null) renderHoverPreview(graphics, hoveredId, mouseX, mouseY);
+        // 点击头像进入独立预览页，不再显示遮挡列表的悬浮窗。
     }
 
     private void renderHoverPreview(GuiGraphics graphics, ResourceLocation id, int mouseX, int mouseY) {
@@ -315,6 +317,22 @@ public final class MobTargetsScreen extends Screen {
                         graphics, x - 9, y - 9, x + 9, y + 9, 12, 0.0F, 0.0F, 0.0F, preview);
             } catch (Throwable ignored) { }
         }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
+            int start = page * rowsPerPage;
+            for (int i = start; i < Math.min(visible.size(), start + rowsPerPage); i++) {
+                int y = 48 + (i - start) * 44;
+                if (mouseX >= left + 4 && mouseX <= left + 34 && mouseY >= y + 15 && mouseY <= y + 43) {
+                    ResourceLocation id = ResourceLocation.tryParse(visible.get(i).entityId());
+                    if (id != null) { minecraft.setScreen(new MobModelPreviewScreen(this, id)); return true; }
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
