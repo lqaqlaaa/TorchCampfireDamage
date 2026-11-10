@@ -299,7 +299,7 @@ public class WardConfigScreen extends Screen {
     private static WardConfigScreen activeInstance;
 
     private void saveInternal() {
-        int range = parseInt(rangeBox.getValue(), chunkMode ? 1 : 16,
+        int range = parseInt(rangeText, chunkMode ? 1 : 16,
                 chunkMode ? 0 : 0, chunkMode ? 32 : 512);
         double damage = parseDouble(damageText, 2.0);
         int interval = parseInt(intervalText, 20, 1, Integer.MAX_VALUE);
