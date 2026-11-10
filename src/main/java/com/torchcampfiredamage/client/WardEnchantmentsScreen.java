@@ -44,8 +44,8 @@ public final class WardEnchantmentsScreen extends Screen {
         clearWidgets();
         int panelWidth = Math.min(440, width - 20);
         int left = (width - panelWidth) / 2;
-        int top = Math.max(38, (height - 190) / 2);
-        int rowHeight = Math.min(34, Math.max(27, (height - top - 48) / TYPES.length));
+        int top = Math.max(38, (height - 260) / 2);
+        int rowHeight = Math.max(40, Math.min(48, (height - top - 48) / TYPES.length));
         for (int i = 0; i < TYPES.length; i++) {
             final String id = TYPES[i][0];
             int y = top + i * rowHeight;
@@ -72,8 +72,8 @@ public final class WardEnchantmentsScreen extends Screen {
         g.drawCenteredString(font, "特殊伤害方式（可多选）", width / 2, 14, GuiLayout.TEXT);
         int panelWidth = Math.min(440, width - 20);
         int left = (width - panelWidth) / 2;
-        int top = Math.max(38, (height - 190) / 2);
-        int rowHeight = Math.min(34, Math.max(27, (height - top - 48) / TYPES.length));
+        int top = Math.max(38, (height - 260) / 2);
+        int rowHeight = Math.max(40, Math.min(48, (height - top - 48) / TYPES.length));
         for (int i = 0; i < TYPES.length; i++) {
             g.drawString(font, TYPES[i][2], left + 5, top + i * rowHeight + 24, 0xFFB8B8B8);
         }
