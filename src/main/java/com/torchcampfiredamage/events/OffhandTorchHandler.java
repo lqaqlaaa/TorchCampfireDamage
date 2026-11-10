@@ -1,6 +1,7 @@
 package com.torchcampfiredamage.events;
 
 import com.torchcampfiredamage.config.ModConfig;
+import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
@@ -15,6 +16,7 @@ import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
