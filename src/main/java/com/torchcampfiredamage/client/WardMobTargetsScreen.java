@@ -68,18 +68,24 @@ public class WardMobTargetsScreen extends Screen {
         for (Mob mob : mc.level.getEntitiesOfClass(Mob.class, area)) {
             if (!mob.isAlive()) continue;
             ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
-            if (id != null) nearby.putIfAbsent(id, mob);
+            if (id != null) {
+                nearby.putIfAbsent(id, mob);
+                PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 3, id.toString(), false));
+            }
         }
 
         String q = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
         List<MobEntry> result = new ArrayList<>();
-        for (var entry : nearby.entrySet()) {
-            ResourceLocation id = entry.getKey();
-            Mob mob = entry.getValue();
+        Set<ResourceLocation> allIds = new TreeSet<>(ward.getDiscoveredMobTargets());
+        allIds.addAll(nearby.keySet());
+        for (ResourceLocation id : allIds) {
+            Mob mob = nearby.get(id);
             boolean configured = targets.containsKey(id);
-            boolean defaultEnabled = isHostile(mob);
+            boolean defaultEnabled = mob != null && isHostile(mob);
             boolean enabled = configured ? targets.get(id) : defaultEnabled;
-            String name = mob.getType().getDescription().getString();
+            String name = mob == null
+                    ? BuiltInRegistries.ENTITY_TYPE.getOptional(id).map(t -> t.getDescription().getString()).orElse(id.toString())
+                    : mob.getType().getDescription().getString();
             if (q.isEmpty() || id.toString().toLowerCase(Locale.ROOT).contains(q)
                     || name.toLowerCase(Locale.ROOT).contains(q)) {
                 result.add(new MobEntry(id, name, enabled, configured));
@@ -137,7 +143,11 @@ public class WardMobTargetsScreen extends Screen {
                     .bounds(toggleX, y, 52, 20).build()));
             if (entry.configured()) {
                 rowButtons.add(addRenderableWidget(Button.builder(Component.literal("默认"),
-                                b -> remove(entry.id()))
+                                b -> reset(entry.id()))
+                        .bounds(resetX, y, 48, 20).build()));
+            } else {
+                rowButtons.add(addRenderableWidget(Button.builder(Component.literal("删除"),
+                                b -> delete(entry.id()))
                         .bounds(resetX, y, 48, 20).build()));
             }
         }
@@ -149,9 +159,15 @@ public class WardMobTargetsScreen extends Screen {
         rebuildRows();
     }
 
-    private void remove(ResourceLocation id) {
+    private void reset(ResourceLocation id) {
         targets.remove(id);
         PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 1, id.toString(), false));
+        rebuildRows();
+    }
+
+    private void delete(ResourceLocation id) {
+        targets.remove(id);
+        PacketDistributor.sendToServer(new WardMobTargetsPayload(pos, 2, id.toString(), false));
         rebuildRows();
     }
 
