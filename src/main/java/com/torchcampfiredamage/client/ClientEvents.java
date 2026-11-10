@@ -28,6 +28,10 @@ public class ClientEvents {
         ClientDebugLog.info("ClientEvents class initialized; client event subscriber loaded.");
     }
 
+    private static String screenName(net.minecraft.client.gui.screens.Screen screen) {
+        return screen == null ? "<none>" : screen.getClass().getName();
+    }
+
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
