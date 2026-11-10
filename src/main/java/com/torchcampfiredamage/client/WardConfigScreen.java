@@ -119,7 +119,7 @@ public class WardConfigScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal(nav[i]), b -> {
                 switch (item) {
                     case 1 -> Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be));
-                    case 2 -> Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getSpecialDamageTypes()));
+                    case 2 -> Minecraft.getInstance().setScreen(new WardDamageTypesScreen(this, pos, be.getSpecialDamageTypes()));
                     case 3 -> { DisplaySettingsScreen.loadFrom(be); Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this)); }
                     case 4 -> { RingSettingsScreen.loadFrom(be); Minecraft.getInstance().setScreen(new RingSettingsScreen(this)); }
                     case 5 -> Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this));
