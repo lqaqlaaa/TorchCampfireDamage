@@ -1,13 +1,11 @@
 package com.torchcampfiredamage.events;
 
-import com.torchcampfiredamage.block.ModBlocks;
 import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.data.PlayerMobTargetsData;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -17,7 +15,6 @@ import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -28,7 +25,7 @@ import java.util.*;
 /**
  * 副手火把效果。
  * <p>
- * 玩家副手持守卫火把时，以其所在区块为中心造成范围伤害。
+ * 仅在 Curios 饰品栏装备守卫护符时生效；不再支持副手持有触发。
  * 伤害值取玩家当前的 ATTACK_DAMAGE 属性（含武器/附魔/修饰符）。
  * 默认每 tick 一次、不播报、不吸掉落物/经验。
  */
@@ -57,16 +54,8 @@ public class OffhandTorchHandler {
         for (Player p : level.players()) {
             if (!(p instanceof ServerPlayer sp)) continue;
 
-            // 副手必须是守卫火把
-            ItemStack off = sp.getItemInHand(InteractionHand.OFF_HAND);
-            // 生效条件（任一满足即可）：
-            //   1) 副手持守卫护符
-            //   2) 副手持守卫火把（不影响方块放置）
-            //   3) Curios 饰品栏里装备了守卫护符
-            boolean isCharm = !off.isEmpty() && off.is(ModBlocks.WARD_CHARM_ITEM.get());
-            boolean isTorch = !off.isEmpty() && off.is(ModBlocks.WARD_TORCH_ITEM.get());
-            boolean hasCurioCharm = hasCharmEquipped(sp);
-            if (!isCharm && !isTorch && !hasCurioCharm) {
+            // 只允许通过 Curios 饰品栏装备守卫护符触发；手持不再触发。
+            if (!hasCharmEquipped(sp)) {
                 lastTime.remove(sp.getUUID());
                 continue;
             }
