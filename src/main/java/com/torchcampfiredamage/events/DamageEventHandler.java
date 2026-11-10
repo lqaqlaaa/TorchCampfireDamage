@@ -35,7 +35,6 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
-import net.neoforged.neoforge.event.entity.living.LootingLevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
@@ -420,15 +419,6 @@ public class DamageEventHandler {
     }
 
     /* ================= 掉落物传送 ================= */
-
-    /** 抢夺在战利品表生成阶段读取，而不是攻击伤害阶段；为本火把击杀临时注入等级。 */
-    @SubscribeEvent
-    public void onLootingLevel(LootingLevelEvent event) {
-        DropTarget target = entityDropTargets.get(event.getEntity().getUUID());
-        if (target != null && target.lootingLevel() > 0) {
-            event.setLootingLevel(Math.max(event.getLootingLevel(), target.lootingLevel()));
-        }
-    }
 
     @SubscribeEvent
     public void onLivingDrops(LivingDropsEvent event) {
