@@ -24,7 +24,7 @@ public record WardDamageTypesPayload(BlockPos pos, int action, String damageType
         @Override public void encode(RegistryFriendlyByteBuf buf, WardDamageTypesPayload payload) {
             buf.writeBlockPos(payload.pos());
             buf.writeVarInt(payload.action());
-            buf.writeUtf(payload.enchantmentId(), 256);
+            buf.writeUtf(payload.damageTypeId(), 256);
             buf.writeVarInt(payload.level());
         }
     };
