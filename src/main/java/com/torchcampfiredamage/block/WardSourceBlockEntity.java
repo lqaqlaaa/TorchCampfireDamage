@@ -40,6 +40,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
     /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
+    /** 本根放置火把独立的攻击附魔配置，键为附魔注册 ID，值为等级。 */
+    private final java.util.Map<net.minecraft.resources.ResourceLocation, Integer> attackEnchantments = new java.util.TreeMap<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -185,6 +187,18 @@ public class WardSourceBlockEntity extends BlockEntity {
         boolean changed = discoveredMobTargets.remove(id);
         changed |= mobTargets.remove(id) != null;
         if (changed) { setChanged(); sync(); }
+    }
+
+    public java.util.Map<net.minecraft.resources.ResourceLocation, Integer> getAttackEnchantments() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(attackEnchantments));
+    }
+    public void setAttackEnchantment(net.minecraft.resources.ResourceLocation id, int level) {
+        if (id == null || level < 1) return;
+        attackEnchantments.put(id, Math.min(Integer.MAX_VALUE, level));
+        setChanged(); sync();
+    }
+    public void removeAttackEnchantment(net.minecraft.resources.ResourceLocation id) {
+        if (id != null && attackEnchantments.remove(id) != null) { setChanged(); sync(); }
     }
 
     public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getMobTargets() {
@@ -397,6 +411,14 @@ public class WardSourceBlockEntity extends BlockEntity {
             discoveredList.add(discovered);
         }
         tag.put("discoveredMobTargets", discoveredList);
+        net.minecraft.nbt.ListTag enchantmentList = new net.minecraft.nbt.ListTag();
+        for (var entry : attackEnchantments.entrySet()) {
+            CompoundTag enchantment = new CompoundTag();
+            enchantment.putString("Id", entry.getKey().toString());
+            enchantment.putInt("Level", entry.getValue());
+            enchantmentList.add(enchantment);
+        }
+        tag.put("attackEnchantments", enchantmentList);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -459,6 +481,16 @@ public class WardSourceBlockEntity extends BlockEntity {
                 CompoundTag item = discovered.getCompound(i);
                 net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(item.getString("Id"));
                 if (id != null) discoveredMobTargets.put(id, item.getBoolean("Enabled"));
+            }
+        }
+        attackEnchantments.clear();
+        if (tag.contains("attackEnchantments", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag enchantments = tag.getList("attackEnchantments", Tag.TAG_COMPOUND);
+            for (int i = 0; i < enchantments.size(); i++) {
+                CompoundTag enchantment = enchantments.getCompound(i);
+                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(enchantment.getString("Id"));
+                int level = enchantment.getInt("Level");
+                if (id != null && level > 0) attackEnchantments.put(id, level);
             }
         }
         // 旧版存档中的显式配置也视为已发现，避免升级后列表项目消失。
