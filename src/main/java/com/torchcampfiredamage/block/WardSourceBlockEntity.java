@@ -179,7 +179,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     }
     public void discoverMobTarget(net.minecraft.resources.ResourceLocation id, boolean defaultEnabled) {
         if (id != null && (!discoveredMobTargets.containsKey(id) || discoveredMobTargets.get(id) != defaultEnabled)) {
-            discoveredMobTargets.put(id, defaultEnabled); setChanged(); sync();
+            discoveredMobTargets.put(id, defaultEnabled); setChanged();
         }
     }
     public void deleteMobTarget(net.minecraft.resources.ResourceLocation id) {
