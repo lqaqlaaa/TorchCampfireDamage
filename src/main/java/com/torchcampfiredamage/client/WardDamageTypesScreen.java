@@ -16,6 +16,7 @@ import java.util.TreeSet;
 public final class WardDamageTypesScreen extends Screen {
     private final Screen parent;
     private final BlockPos pos;
+    private boolean forceOneHealth;
     private final Set<String> selected = new TreeSet<>();
     private static final String[][] TYPES = {
             {"fire", "火焰伤害", "直接造成火焰类型伤害，受火焰免疫影响"},
@@ -25,10 +26,11 @@ public final class WardDamageTypesScreen extends Screen {
             {"wither", "凋零伤害", "使用原版凋零伤害来源"}
     };
 
-    public WardDamageTypesScreen(Screen parent, BlockPos pos, Set<String> current) {
+    public WardDamageTypesScreen(Screen parent, BlockPos pos, Set<String> current, boolean forceOneHealth) {
         super(Component.literal("守卫火把 · 伤害方法"));
         this.parent = parent;
         this.pos = pos;
+        this.forceOneHealth = forceOneHealth;
         if (current != null) selected.addAll(current);
     }
 
@@ -38,9 +40,9 @@ public final class WardDamageTypesScreen extends Screen {
         int left = (width - panelWidth) / 2;
         int top = Math.max(38, (height - 260) / 2);
         int rowHeight = Math.max(40, Math.min(48, (height - top - 48) / TYPES.length));
-        addRenderableWidget(Button.builder(Component.literal("强制一滴血：单独伤害方法"), b -> {
-            boolean enable = !selected.contains("one_hit");
-            if (enable) selected.add("one_hit"); else selected.remove("one_hit");
+        addRenderableWidget(Button.builder(Component.literal("强制一滴血：" + (forceOneHealth ? "开启" : "关闭")), b -> {
+            boolean enable = !forceOneHealth;
+            forceOneHealth = enable;
             PacketDistributor.sendToServer(new WardDamageTypesPayload(pos, 3, "one_hit", enable ? 1 : 0));
             b.setMessage(Component.literal("强制一滴血：" + (enable ? "开启" : "关闭")));
         }).bounds(left, Math.max(8, top - 26), panelWidth, 20).build());
