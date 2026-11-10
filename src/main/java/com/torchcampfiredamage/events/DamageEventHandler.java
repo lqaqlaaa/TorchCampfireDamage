@@ -334,9 +334,11 @@ public class DamageEventHandler {
                     announceKill(level, center, mob);
                 }
             } else {
-                // Keep the target briefly after a non-lethal hit. Some modded mobs defer
-                // their death/loot generation or die from a post-hit effect a few ticks later.
-                // cleanPending() expires this entry after 200 ticks if the mob survives.
+                // 伤害没有在本次调用中击杀目标时，立即撤销掉落归属。
+                // 否则玩家或其他伤害来源在清理窗口内击杀它，会错误地把掉落传送到火把。
+                entityDropTargets.remove(mob.getUUID());
+                CONSUMED.remove(mob.getUUID());
+                pendingCleanup.remove(mob.getUUID());
             }
         }
     }
