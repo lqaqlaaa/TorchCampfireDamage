@@ -347,21 +347,18 @@ public class GlobalSettingsScreen extends Screen {
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
 
-        // 石质面板与分区底色
-        int panel = 0xE8202020;
-        int border = 0xFF777777;
-        gg.fill(6, 6, this.width - 6, this.height - 6, 0xD8101010);
-        gg.fill(7, 7, this.width - 7, 30, 0xFF292929);
-        gg.fill(8, 32, 12 + sideW, this.height - 8, panel);
-        gg.fill(contentX - 2, 32, this.width - 8, this.height - 8, panel);
-        gg.renderOutline(6, 6, this.width - 12, this.height - 12, border);
-        gg.renderOutline(8, 32, sideW + 4, this.height - 40, 0xFF555555);
-        gg.renderOutline(contentX - 2, 32, this.width - contentX - 6, this.height - 40, 0xFF555555);
+        // Shared dark workspace and blue brand accents.
+        GuiLayout.drawFrame(gg, this.width, this.height);
+        gg.fill(12, 40, 12 + sideW, this.height - 12, 0xC9101B2B);
+        gg.fill(contentX - 2, 40, this.width - 12, this.height - 12, 0x66121F32);
+        gg.renderOutline(12, 40, sideW, this.height - 52, 0xFF263F60);
+        gg.renderOutline(contentX - 2, 40, this.width - contentX - 10, this.height - 52, 0xFF263F60);
 
         super.render(gg, mouseX, mouseY, partialTick);
 
         String categoryName = activeCategory == 0 ? "通用设置" : activeCategory == 1 ? "副手火把设置" : "放置火把默认设置";
-        gg.drawString(font, "守卫火把", 16, 12, 0xFFFFD76A, false);
+        gg.fill(16, 29, 82, 31, 0xFF398BFF);
+        gg.drawString(font, "守卫火把", 16, 12, 0xFF70AEFF, false);
         gg.drawString(font, categoryName, contentX + 8, 12, 0xFFFFFFFF, false);
         gg.drawString(font, "第 " + (page + 1) + " / " + pageCount + " 页", this.width - 70, 12, 0xFFB8B8B8, false);
 
@@ -377,7 +374,8 @@ public class GlobalSettingsScreen extends Screen {
             int rowIdx = idx / cols;
             int baseX = contentX + col * (colW + gap);
             int y = top + rowIdx * rowH;
-            gg.fill(baseX + 2, y - 3, baseX + colW - 2, y + 24, 0x553F3F3F);
+            gg.fill(baseX + 2, y - 3, baseX + colW - 2, y + 24, 0x66304765);
+            gg.fill(baseX + 2, y - 3, baseX + 4, y + 24, 0xFF398BFF);
             gg.drawString(font, rows.get(i).label(), baseX + 7, y + 6, 0xFFE6E6E6, false);
         }
     }
