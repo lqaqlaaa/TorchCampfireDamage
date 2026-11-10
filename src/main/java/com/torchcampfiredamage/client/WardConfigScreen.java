@@ -192,7 +192,7 @@ public class WardConfigScreen extends Screen {
 
         // ---- 底部按钮区（两行三列，居中）----
         int bw = bottomButtonW;
-        int gap = layoutGap
+        int gap = layoutGap;
         int totalW = bw * 3 + gap * 2;
         int bx0 = cx - totalW / 2;
         int by1 = top + ROW_H * 7 + GuiLayout.px(16, width, height, 8);
