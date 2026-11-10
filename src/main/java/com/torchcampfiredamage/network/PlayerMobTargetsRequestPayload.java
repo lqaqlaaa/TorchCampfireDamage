@@ -33,7 +33,7 @@ public record PlayerMobTargetsRequestPayload(int action, String entityId, boolea
                 case 1 -> data.setEnabled(player.getUUID(),id,p.enabled());
                 case 2 -> data.remove(player.getUUID(),id);
                 case 3 -> data.delete(player.getUUID(),id);
-                case 4 -> data.discover(player.getUUID(),id);
+                case 4 -> { data.discover(player.getUUID(),id,p.enabled()); return; }
                 default -> { return; }
             }
             var entries=data.getEntries(player.getUUID()).entrySet().stream()
