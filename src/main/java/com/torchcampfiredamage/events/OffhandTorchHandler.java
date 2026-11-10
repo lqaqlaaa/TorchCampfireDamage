@@ -111,11 +111,14 @@ public class OffhandTorchHandler {
             Set<UUID> done = new HashSet<>();
 
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
-                if (!mob.isAlive() || done.contains(mob.getUUID())) continue;
+                if (!mob.isAlive()) continue;
+                // 持有副手火把时的服务端扫描同样自动记录发现的实体类型。
+                PlayerMobTargetsData mobTargets = PlayerMobTargetsData.get(level.getServer());
+                mobTargets.discover(sp.getUUID(), net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()), isHostile(mob));
+                if (done.contains(mob.getUUID())) continue;
                 // 与方块火把一致：跳过被命名的生物（白名单保护）
                 if (ignoreNamed && mob.hasCustomName()) continue;
                 // 显式名单只覆盖对应实体；名单外继续执行原有敌对/仇恨判定。
-                PlayerMobTargetsData mobTargets = PlayerMobTargetsData.get(level.getServer());
                 if (mobTargets.hasOverride(sp.getUUID(), mob.getType())) {
                     if (!mobTargets.isEnabled(sp.getUUID(), mob.getType())) continue;
                 } else if (!isHostile(mob)) {
