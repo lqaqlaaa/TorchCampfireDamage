@@ -165,6 +165,7 @@ public class DisplaySettingsScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
 
         gg.drawCenteredString(this.font, "显示设置", this.width / 2, 8, 0xFFD700);
