@@ -11,6 +11,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import foundry.imgui.neoforge.api.event.RenderImGuiEventsNeoforge;
 
 /**
  * 客户端：右键守卫火把直接打开设置界面（不需要潜行）。
@@ -22,6 +23,12 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 public class ClientEvents {
 
     private static boolean wasUsePressed = false;
+
+    @SubscribeEvent
+    public static void onImGuiRender(RenderImGuiEventsNeoforge.Post event) {
+        // Register through the same client subscriber that already handles the O key.
+        ImGuiSettingsScreen.renderActiveImGui();
+    }
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
