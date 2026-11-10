@@ -24,6 +24,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     private static long nextPlacementSequence;
     /** 持久化的放置顺序，用于重叠攻击区域的稳定优先级。 */
     private long placementOrder;
+    private long lastDiscoverySync = Long.MIN_VALUE;
 
     private boolean enabled = true;
     /** true = 区块模式, false = 方块模式 */
@@ -189,7 +190,15 @@ public class WardSourceBlockEntity extends BlockEntity {
     }
     public void discoverMobTarget(net.minecraft.resources.ResourceLocation id, boolean defaultEnabled) {
         if (id != null && (!discoveredMobTargets.containsKey(id) || discoveredMobTargets.get(id) != defaultEnabled)) {
-            discoveredMobTargets.put(id, defaultEnabled); setChanged();
+            discoveredMobTargets.put(id, defaultEnabled);
+            setChanged();
+            // 发现记录要持久化并最终同步给客户端，但不能每出现一种生物就广播方块更新。
+            // 每根火把最多每 100 tick 同步一次，GUI 打开时能拿到较新的完整名单。
+            if (level != null && !level.isClientSide
+                    && (lastDiscoverySync == Long.MIN_VALUE || level.getGameTime() - lastDiscoverySync >= 100)) {
+                lastDiscoverySync = level.getGameTime();
+                sync();
+            }
         }
     }
     public void deleteMobTarget(net.minecraft.resources.ResourceLocation id) {
