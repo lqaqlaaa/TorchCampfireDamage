@@ -213,7 +213,10 @@ public class WardMobTargetsScreen extends Screen {
                 gg.fill(left, y - 10, left + panelWidth, y - 9, 0xFF777777);
                 gg.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
             }
+            // 裁剪模型预览，防止末影龙、巨人等大型模型绘制到其他条目上。
+            gg.enableScissor(left + 2, y - 8, left + 34, y + 34);
             renderPreview(gg, entry.id(), left + 18, y + 32);
+            gg.disableScissor();
             gg.drawString(font, label, left + 38, y + 4, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             gg.drawString(font, entry.id().toString(), left + 38, y + 13, 0x888888);
         }
