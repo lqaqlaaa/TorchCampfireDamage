@@ -39,7 +39,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     /** 本方块独立的攻击生物名单；空名单表示沿用默认行为（攻击所有敌对生物）。 */
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
     /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
-    private final java.util.Set<net.minecraft.resources.ResourceLocation> discoveredMobTargets = new java.util.TreeSet<>();
+    private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -172,11 +172,13 @@ public class WardSourceBlockEntity extends BlockEntity {
     public boolean isIgnoreNamed() { return ignoreNamed; }
     public void setIgnoreNamed(boolean v) { this.ignoreNamed = v; setChanged(); }
 
-    public java.util.Set<net.minecraft.resources.ResourceLocation> getDiscoveredMobTargets() {
-        return java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(discoveredMobTargets));
+    public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getDiscoveredMobTargetDefaults() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(discoveredMobTargets));
     }
-    public void discoverMobTarget(net.minecraft.resources.ResourceLocation id) {
-        if (id != null && discoveredMobTargets.add(id)) { setChanged(); sync(); }
+    public void discoverMobTarget(net.minecraft.resources.ResourceLocation id, boolean defaultEnabled) {
+        if (id != null && (!discoveredMobTargets.containsKey(id) || discoveredMobTargets.get(id) != defaultEnabled)) {
+            discoveredMobTargets.put(id, defaultEnabled); setChanged(); sync();
+        }
     }
     public void deleteMobTarget(net.minecraft.resources.ResourceLocation id) {
         if (id == null) return;
@@ -388,7 +390,12 @@ public class WardSourceBlockEntity extends BlockEntity {
         }
         tag.put("mobTargets", mobTargetList);
         net.minecraft.nbt.ListTag discoveredList = new net.minecraft.nbt.ListTag();
-        for (var id : discoveredMobTargets) discoveredList.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
+        for (var entry : discoveredMobTargets.entrySet()) {
+            CompoundTag discovered = new CompoundTag();
+            discovered.putString("Id", entry.getKey().toString());
+            discovered.putBoolean("Enabled", entry.getValue());
+            discoveredList.add(discovered);
+        }
         tag.put("discoveredMobTargets", discoveredList);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
@@ -447,14 +454,15 @@ public class WardSourceBlockEntity extends BlockEntity {
         }
         discoveredMobTargets.clear();
         if (tag.contains("discoveredMobTargets", Tag.TAG_LIST)) {
-            net.minecraft.nbt.ListTag discovered = tag.getList("discoveredMobTargets", Tag.TAG_STRING);
+            net.minecraft.nbt.ListTag discovered = tag.getList("discoveredMobTargets", Tag.TAG_COMPOUND);
             for (int i=0;i<discovered.size();i++) {
-                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(discovered.getString(i));
-                if (id != null) discoveredMobTargets.add(id);
+                CompoundTag item = discovered.getCompound(i);
+                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(item.getString("Id"));
+                if (id != null) discoveredMobTargets.put(id, item.getBoolean("Enabled"));
             }
         }
         // 旧版存档中的显式配置也视为已发现，避免升级后列表项目消失。
-        discoveredMobTargets.addAll(mobTargets.keySet());
+        for (var entry : mobTargets.entrySet()) discoveredMobTargets.putIfAbsent(entry.getKey(), entry.getValue());
         if (tag.contains("ignoreNamed")) {
             ignoreNamed = tag.getBoolean("ignoreNamed");
         } else {
