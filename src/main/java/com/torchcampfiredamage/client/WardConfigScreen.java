@@ -89,7 +89,8 @@ public class WardConfigScreen extends Screen {
         int right = cx + colGap / 2;
         // 内容总高约 6 行 + 2 行按钮
         int contentH = ROW_H * 7 + CONTROL_H * 2 + GuiLayout.px(24, width, height, 12);
-        int top = Math.max(8, (this.height - contentH) / 2);
+        int top = Math.max(GuiLayout.px(48, width, height, 34),
+                (this.height - contentH - GuiLayout.px(28, width, height, 18)) / 2);
         int y = top;
 
         // ---- 左列：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 ----
@@ -399,7 +400,18 @@ public class WardConfigScreen extends Screen {
         GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        GuiLayout.drawTitle(gg, this.font, this.width, Math.max(4, _top - 24), "火把参数设置", "当前放置火把 · 独立配置");
+        int panelTop = Math.max(34, _top - 18);
+        int panelBottom = Math.min(height - 34, _top + ROW_H * 7 + CONTROL_H * 2 + GuiLayout.px(28, width, height, 16));
+        int panelLeft = Math.max(6, _left - LABEL_W - GuiLayout.px(8, width, height, 4));
+        int panelRight = Math.min(width - 6, _right + BTN_W + GuiLayout.px(8, width, height, 4));
+        int mid = (_left + _right + BTN_W) / 2;
+        gg.fill(panelLeft, panelTop, mid - layoutGap, panelBottom, 0xD9101B2B);
+        gg.fill(mid + layoutGap, panelTop, panelRight, panelBottom, 0xD9101B2B);
+        gg.fill(panelLeft, panelTop, mid - layoutGap, panelTop + GuiLayout.px(3, width, height, 2), GuiLayout.ACCENT);
+        gg.fill(mid + layoutGap, panelTop, panelRight, panelTop + GuiLayout.px(3, width, height, 2), GuiLayout.ACCENT);
+        gg.renderOutline(panelLeft, panelTop, mid - layoutGap - panelLeft, panelBottom - panelTop, GuiLayout.BORDER);
+        gg.renderOutline(mid + layoutGap, panelTop, panelRight - mid - layoutGap, panelBottom - panelTop, GuiLayout.BORDER);
+        GuiLayout.drawTitle(gg, this.font, this.width, Math.max(8, panelTop - 20), "火把参数设置", "当前放置火把 · 独立配置");
         gg.drawString(this.font,
                 "坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
                 _left, _top - 10, GuiLayout.MUTED);
@@ -407,11 +419,17 @@ public class WardConfigScreen extends Screen {
         // 左列标签
         String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔", "攻击生物"};
         for (int i = 0; i < leftLabels.length; i++) {
-            gg.drawString(this.font, leftLabels[i], _left - LABEL_W, _top + i * ROW_H + 5, GuiLayout.TEXT);
+            int y = _top + i * ROW_H;
+            gg.fill(_left - LABEL_W - 3, y - 2, _left + BTN_W + 2, y + CONTROL_H + 2, 0x66304765);
+            gg.fill(_left - LABEL_W - 3, y - 2, _left - LABEL_W - 1, y + CONTROL_H + 2, GuiLayout.ACCENT);
+            gg.drawString(this.font, leftLabels[i], _left - LABEL_W, y + 5, GuiLayout.TEXT);
         }
         String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物"};
         for (int i = 0; i < rightLabels.length; i++) {
-            gg.drawString(this.font, rightLabels[i], _right - LABEL_W, _top + i * ROW_H + 5, GuiLayout.TEXT);
+            int y = _top + i * ROW_H;
+            gg.fill(_right - LABEL_W - 3, y - 2, _right + BTN_W + 2, y + CONTROL_H + 2, 0x66304765);
+            gg.fill(_right - LABEL_W - 3, y - 2, _right - LABEL_W - 1, y + CONTROL_H + 2, GuiLayout.ACCENT);
+            gg.drawString(this.font, rightLabels[i], _right - LABEL_W, y + 5, GuiLayout.TEXT);
         }
     }
 
