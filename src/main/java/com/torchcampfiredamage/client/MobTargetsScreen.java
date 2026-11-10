@@ -43,6 +43,8 @@ public final class MobTargetsScreen extends Screen {
     private int page;
     private int rowsPerPage;
     private boolean requestSent;
+    private EditBox search;
+    private String searchText = "";
     private final Map<ResourceLocation, Mob> previews = new HashMap<>();
 
     public MobTargetsScreen(Screen parent) {
@@ -53,21 +55,28 @@ public final class MobTargetsScreen extends Screen {
     @Override
     protected void init() {
         current = this;
-        rowsPerPage = Math.max(1, Math.min(7, (height - 132) / 44));
+        rowsPerPage = Math.max(1, Math.min(7, (height - 166) / 44));
         visible = scanNearby();
         int pageCount = pageCount();
         if (page >= pageCount) page = pageCount - 1;
         clearWidgets();
 
+        int panelWidth = Math.min(420, width - 16);
+        int left = Math.max(8, (width - panelWidth) / 2);
+        search = new EditBox(font, left, 44, panelWidth, 20, Component.literal("搜索生物"));
+        search.setHint(Component.literal("输入生物名称、实体 ID 或模组 ID"));
+        search.setValue(searchText);
+        search.setResponder(value -> { searchText = value; page = 0; init(); });
+        addRenderableWidget(search);
+        List<PlayerMobTargetsSyncPayload.Entry> filtered = filteredEntries();
         int start = page * rowsPerPage;
-        int end = Math.min(visible.size(), start + rowsPerPage);
+        int end = Math.min(filtered.size(), start + rowsPerPage);
         int rowHeight = 44;
-        int listTop = 48;
-        int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
-        int listWidth = Math.min(420, width - 16);
+        int listTop = 72;
+        int listWidth = panelWidth;
 
         for (int i = start; i < end; i++) {
-            PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
+            PlayerMobTargetsSyncPayload.Entry entry = filtered.get(i);
             int y = listTop + (i - start) * rowHeight + 18;
             int right = left + listWidth;
             boolean configured = entry.configured();
@@ -165,8 +174,19 @@ public final class MobTargetsScreen extends Screen {
         return findConfigured(id) != null;
     }
 
+    private List<PlayerMobTargetsSyncPayload.Entry> filteredEntries() {
+        String query = searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
+        if (query.isEmpty()) return visible;
+        return visible.stream().filter(entry -> {
+            String id = entry.entityId().toLowerCase(Locale.ROOT);
+            String namespace = namespaceOf(entry.entityId()).toLowerCase(Locale.ROOT);
+            String name = displayName(entry.entityId()).toLowerCase(Locale.ROOT);
+            return id.contains(query) || namespace.contains(query) || name.contains(query);
+        }).toList();
+    }
+
     private int pageCount() {
-        return Math.max(1, (visible.size() + Math.max(1, rowsPerPage) - 1) / Math.max(1, rowsPerPage));
+        return Math.max(1, (filteredEntries().size() + Math.max(1, rowsPerPage) - 1) / Math.max(1, rowsPerPage));
     }
 
     private void requestList() {
@@ -202,22 +222,23 @@ public final class MobTargetsScreen extends Screen {
         graphics.drawCenteredString(font, "副手火把 / 护符 · 附近生物", width / 2, 10, 0xFFD700);
         graphics.drawCenteredString(font, "扫描副手攻击范围；敌对/仇恨生物默认开启，其他生物默认关闭",
                 width / 2, 24, 0xAAAAAA);
+        List<PlayerMobTargetsSyncPayload.Entry> filtered = filteredEntries();
         graphics.drawCenteredString(font, "第 " + (page + 1) + " / " + pageCount()
-                + " 页    当前范围内 " + visible.size() + " 种", width / 2, 36, 0xFFFFFF);
+                + " 页    搜索结果 " + filtered.size() + " 种 / 范围内 " + visible.size() + " 种", width / 2, 36, 0xFFFFFF);
 
         int rowHeight = 44;
-        int listTop = 48;
+        int listTop = 72;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
         int start = page * rowsPerPage;
-        int end = Math.min(visible.size(), start + rowsPerPage);
-        if (visible.isEmpty()) {
+        int end = Math.min(filtered.size(), start + rowsPerPage);
+        if (filtered.isEmpty()) {
             graphics.drawCenteredString(font, "攻击范围内暂时没有生物，点击刷新重新扫描。",
                     width / 2, height / 2 - 8, 0xBBBBBB);
         }
         ResourceLocation hoveredId = null;
         for (int i = start; i < end; i++) {
-            PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
+            PlayerMobTargetsSyncPayload.Entry entry = filtered.get(i);
             int y = listTop + (i - start) * rowHeight;
             if (mouseX >= left + 4 && mouseX <= left + 32 && mouseY >= y + 16 && mouseY <= y + 42) {
                 hoveredId = ResourceLocation.tryParse(entry.entityId());
@@ -232,7 +253,7 @@ public final class MobTargetsScreen extends Screen {
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
             String namespace = id == null ? "unknown" : id.getNamespace();
-            if (i == start || !namespace.equals(namespaceOf(visible.get(i - 1).entityId()))) {
+            if (i == start || !namespace.equals(namespaceOf(filtered.get(i - 1).entityId()))) {
                 String group = namespace.equals("minecraft") ? "Minecraft 原版" : namespace;
                 graphics.fill(left, y + 13, left + listWidth, y + 14, 0xFF777777);
                 graphics.drawString(font, group, left + 4, y + 3, 0xFFFFD700);
@@ -324,10 +345,11 @@ public final class MobTargetsScreen extends Screen {
         if (button == 0) {
             int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
             int start = page * rowsPerPage;
-            for (int i = start; i < Math.min(visible.size(), start + rowsPerPage); i++) {
-                int y = 48 + (i - start) * 44;
+            List<PlayerMobTargetsSyncPayload.Entry> filtered = filteredEntries();
+            for (int i = start; i < Math.min(filtered.size(), start + rowsPerPage); i++) {
+                int y = 72 + (i - start) * 44;
                 if (mouseX >= left + 4 && mouseX <= left + 34 && mouseY >= y + 15 && mouseY <= y + 43) {
-                    ResourceLocation id = ResourceLocation.tryParse(visible.get(i).entityId());
+                    ResourceLocation id = ResourceLocation.tryParse(filtered.get(i).entityId());
                     if (id != null) { minecraft.setScreen(new MobModelPreviewScreen(this, id)); return true; }
                 }
             }
