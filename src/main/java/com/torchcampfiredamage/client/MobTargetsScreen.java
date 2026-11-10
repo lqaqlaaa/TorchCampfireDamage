@@ -37,6 +37,7 @@ public final class MobTargetsScreen extends Screen {
     private List<PlayerMobTargetsSyncPayload.Entry> visible = new ArrayList<>();
     private int page;
     private int rowsPerPage;
+    private boolean requestSent;
 
     public MobTargetsScreen(Screen parent) {
         super(Component.literal("副手火把生物列表"));
@@ -84,6 +85,7 @@ public final class MobTargetsScreen extends Screen {
         int controlsLeft = (width - controlsWidth) / 2;
         int controlsY = height - 52;
         addRenderableWidget(Button.builder(Component.literal("刷新"), b -> {
+            requestSent = true;
             requestList();
             visible = scanNearby();
             page = 0;
@@ -98,7 +100,7 @@ public final class MobTargetsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> minecraft.setScreen(parent))
                 .bounds(controlsLeft + 128, controlsY, 56, 20).build());
 
-        if (targets.isEmpty()) requestList();
+        if (!requestSent) { requestSent = true; requestList(); }
     }
 
     private List<PlayerMobTargetsSyncPayload.Entry> scanNearby() {
@@ -170,6 +172,7 @@ public final class MobTargetsScreen extends Screen {
     public static void receive(List<PlayerMobTargetsSyncPayload.Entry> entries) {
         if (current == null) return;
         current.targets = new ArrayList<>(entries);
+        current.requestSent = true;
         current.init();
     }
 
