@@ -45,8 +45,8 @@ public class WardSourceBlockEntity extends BlockEntity {
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> mobTargets = new java.util.TreeMap<>();
     /** 曾在本火把攻击范围内发现过的生物类型；独立于显式开关覆盖保存。 */
     private final java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> discoveredMobTargets = new java.util.TreeMap<>();
-    /** 本根放置火把独立的攻击附魔配置，键为附魔注册 ID，值为等级。 */
-    private final java.util.Map<net.minecraft.resources.ResourceLocation, Integer> attackEnchantments = new java.util.TreeMap<>();
+    /** 本根火把启用的伤害方式；旧存档中的附魔配置升级后不再参与攻击。 */
+    private final java.util.Set<String> specialDamageTypes = new java.util.TreeSet<>();
 
     /* ===== 星环系统（最多 5 个环） ===== */
 
@@ -208,16 +208,13 @@ public class WardSourceBlockEntity extends BlockEntity {
         if (changed) { setChanged(); sync(); }
     }
 
-    public java.util.Map<net.minecraft.resources.ResourceLocation, Integer> getAttackEnchantments() {
-        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(attackEnchantments));
+    public java.util.Set<String> getSpecialDamageTypes() {
+        return java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(specialDamageTypes));
     }
-    public void setAttackEnchantment(net.minecraft.resources.ResourceLocation id, int level) {
-        if (id == null || level < 1) return;
-        attackEnchantments.put(id, Math.min(Integer.MAX_VALUE, level));
+    public void setSpecialDamageType(String id, boolean enabled) {
+        if (id == null || !java.util.Set.of("fire", "burn", "magic", "lightning", "wither").contains(id)) return;
+        if (enabled) specialDamageTypes.add(id); else specialDamageTypes.remove(id);
         setChanged(); sync();
-    }
-    public void removeAttackEnchantment(net.minecraft.resources.ResourceLocation id) {
-        if (id != null && attackEnchantments.remove(id) != null) { setChanged(); sync(); }
     }
 
     public java.util.Map<net.minecraft.resources.ResourceLocation, Boolean> getMobTargets() {
@@ -431,14 +428,9 @@ public class WardSourceBlockEntity extends BlockEntity {
             discoveredList.add(discovered);
         }
         tag.put("discoveredMobTargets", discoveredList);
-        net.minecraft.nbt.ListTag enchantmentList = new net.minecraft.nbt.ListTag();
-        for (var entry : attackEnchantments.entrySet()) {
-            CompoundTag enchantment = new CompoundTag();
-            enchantment.putString("Id", entry.getKey().toString());
-            enchantment.putInt("Level", entry.getValue());
-            enchantmentList.add(enchantment);
-        }
-        tag.put("attackEnchantments", enchantmentList);
+        net.minecraft.nbt.ListTag damageTypes = new net.minecraft.nbt.ListTag();
+        for (String id : specialDamageTypes) damageTypes.add(net.minecraft.nbt.StringTag.valueOf(id));
+        tag.put("specialDamageTypes", damageTypes);
         tag.putBoolean("orbitVisible", orbitVisible);
         tag.putFloat("centerScale", centerScale);
         tag.putFloat("centerSpin", centerSpin);
@@ -504,14 +496,12 @@ public class WardSourceBlockEntity extends BlockEntity {
                 if (id != null) discoveredMobTargets.put(id, item.getBoolean("Enabled"));
             }
         }
-        attackEnchantments.clear();
-        if (tag.contains("attackEnchantments", Tag.TAG_LIST)) {
-            net.minecraft.nbt.ListTag enchantments = tag.getList("attackEnchantments", Tag.TAG_COMPOUND);
-            for (int i = 0; i < enchantments.size(); i++) {
-                CompoundTag enchantment = enchantments.getCompound(i);
-                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(enchantment.getString("Id"));
-                int level = enchantment.getInt("Level");
-                if (id != null && level > 0) attackEnchantments.put(id, level);
+        specialDamageTypes.clear();
+        if (tag.contains("specialDamageTypes", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag types = tag.getList("specialDamageTypes", Tag.TAG_STRING);
+            for (int i = 0; i < types.size(); i++) {
+                String id = types.getString(i);
+                if (java.util.Set.of("fire", "burn", "magic", "lightning", "wither").contains(id)) specialDamageTypes.add(id);
             }
         }
         // 旧版存档中的显式配置也视为已发现，避免升级后列表项目消失。
