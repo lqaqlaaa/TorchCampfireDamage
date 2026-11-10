@@ -72,172 +72,122 @@ public class WardConfigScreen extends Screen {
         this.intervalText = String.valueOf(be.getInterval());
     }
 
+    // O 键主界面同款：左侧导航 + 右侧内容工作区 + 底部固定操作区
+    private int sideW, contentX, contentY, contentW, contentH;
+    private int rowH, controlH, labelW, controlW, columnGap, columns;
+    private int leftColumnX, rightColumnX, rowsTop;
+
     @Override
     protected void init() {
         activeInstance = this;
-        float scale = GuiLayout.scale(this.width, this.height);
-        ROW_H = GuiLayout.px(22, width, height, 15);
-        LABEL_W = GuiLayout.px(56, width, height, 34);
-        BOX_W = GuiLayout.px(78, width, height, 58);
-        BTN_W = BOX_W;
-        CONTROL_H = GuiLayout.px(20, width, height, 14);
-        bottomButtonW = GuiLayout.px(88, width, height, 58);
-        layoutGap = GuiLayout.px(6, width, height, 3);
-        int cx = this.width / 2;
-        int colGap = GuiLayout.px(24, width, height, 8);
-        int left = cx - colGap / 2 - BOX_W;
-        int right = cx + colGap / 2;
-        // 内容总高约 6 行 + 2 行按钮
-        int contentH = ROW_H * 7 + CONTROL_H * 2 + GuiLayout.px(24, width, height, 12);
-        int top = Math.max(GuiLayout.px(48, width, height, 34),
-                (this.height - contentH - GuiLayout.px(28, width, height, 18)) / 2);
-        int y = top;
+        sideW = Math.max(76, Math.min(104, width / 4));
+        contentX = 12 + sideW + 8;
+        contentY = 42;
+        contentW = Math.max(120, width - contentX - 12);
+        contentH = Math.max(48, height - contentY - 36);
 
-        // ---- 左列：开关 / 范围类型 / 伤害范围 / 伤害 / 伤害间隔 ----
-        // 开关
+        columns = contentW >= 430 ? 2 : 1;
+        columnGap = columns == 2 ? 14 : 0;
+        int colW = Math.max(110, (contentW - columnGap) / columns);
+        labelW = Math.min(112, Math.max(58, colW / 3));
+        controlW = Math.max(48, colW - labelW - 16);
+        controlH = Math.max(14, Math.min(20, GuiLayout.px(20, width, height, 14)));
+        rowH = Math.max(controlH + 7, Math.min(34, contentH / 7));
+        rowsTop = contentY + 24;
+        leftColumnX = contentX;
+        rightColumnX = contentX + (columns == 2 ? colW + columnGap : 0);
+
+        int cx = width / 2;
+        // 左侧导航沿用 O 键菜单的入口组织方式
+        String[] nav = {"参数设置", "生物列表", "攻击附魔", "显示设置", "星环设置", "全局设置"};
+        int navY = 48;
+        int navH = Math.max(20, Math.min(24, controlH + 4));
+        int navGap = 5;
+        for (int i = 0; i < nav.length; i++) {
+            final int item = i;
+            addRenderableWidget(Button.builder(Component.literal(nav[i]), b -> {
+                switch (item) {
+                    case 1 -> Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be));
+                    case 2 -> Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments()));
+                    case 3 -> {
+                        DisplaySettingsScreen.loadFrom(be);
+                        Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
+                    }
+                    case 4 -> {
+                        RingSettingsScreen.loadFrom(be);
+                        Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
+                    }
+                    case 5 -> Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this));
+                    default -> { }
+                }
+            }).bounds(12, navY + i * (navH + navGap), sideW, navH).build());
+        }
+
+        // 左列六项
+        int lx = leftColumnX + labelW + 8;
+        int y = rowsTop;
         addRenderableWidget(Button.builder(onOffText(enabled), b -> {
-            enabled = !enabled;
-            b.setMessage(onOffText(enabled));
-        }).bounds(left, y, BTN_W, CONTROL_H).build());
-        y += ROW_H;
-
-        // 范围类型
+            enabled = !enabled; b.setMessage(onOffText(enabled));
+        }).bounds(lx, y, controlW, controlH).build());
+        y += rowH;
         addRenderableWidget(Button.builder(rangeTypeText(), b -> {
-            chunkMode = !chunkMode;
-            b.setMessage(rangeTypeText());
-            rangeText = String.valueOf(convertRange());
-            rangeBox.setValue(rangeText);
-        }).bounds(left, y, BTN_W, CONTROL_H).build());
-        y += ROW_H;
-
-        // 伤害范围（数值框）
-        rangeBox = new EditBox(this.font, left, y, BTN_W, CONTROL_H, Component.literal("伤害范围"));
+            chunkMode = !chunkMode; b.setMessage(rangeTypeText());
+            rangeText = String.valueOf(convertRange()); rangeBox.setValue(rangeText);
+        }).bounds(lx, y, controlW, controlH).build());
+        y += rowH;
+        rangeBox = new EditBox(font, lx, y, controlW, controlH, Component.literal("伤害范围"));
         rangeBox.setValue(rangeText);
         rangeBox.setResponder(t -> rangeText = t);
-        rangeBox.setTooltip(Tooltip.create(Component.literal(
-                "区块模式：0=1x1区块, 1=3x3, 2=5x5, 3=7x7, 4=9x9\n方块模式：格数半径")));
+        rangeBox.setTooltip(Tooltip.create(Component.literal("区块模式：0=1x1区块，1=3x3，2=5x5；方块模式：格数半径")));
         addRenderableWidget(rangeBox);
-        y += ROW_H;
-
-        // 伤害
-        damageBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害"));
-        damageBox.setValue(damageText);
-        damageBox.setResponder(t -> damageText = t);
-        damageBox.setTooltip(Tooltip.create(Component.literal("填 0 = 只发光/减速，不造成伤害\n无上限")));
+        y += rowH;
+        damageBox = new EditBox(font, lx, y, controlW, controlH, Component.literal("伤害"));
+        damageBox.setValue(damageText); damageBox.setResponder(t -> damageText = t);
+        damageBox.setTooltip(Tooltip.create(Component.literal("填 0 = 只发光/减速，不造成伤害")));
         addRenderableWidget(damageBox);
-        y += ROW_H;
-
-        // 伤害间隔
-        intervalBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害间隔"));
-        intervalBox.setValue(intervalText);
-        intervalBox.setResponder(t -> intervalText = t);
-        intervalBox.setTooltip(Tooltip.create(Component.literal("单位 tick\n20 = 1秒，1 = 每tick")));
+        y += rowH;
+        intervalBox = new EditBox(font, lx, y, controlW, controlH, Component.literal("伤害间隔"));
+        intervalBox.setValue(intervalText); intervalBox.setResponder(t -> intervalText = t);
+        intervalBox.setTooltip(Tooltip.create(Component.literal("单位 tick；20 = 1 秒")));
         addRenderableWidget(intervalBox);
-        y += ROW_H;
-
-        // 当前方块火把独立的攻击生物名单。
-        addRenderableWidget(Button.builder(Component.literal("攻击生物名单"), b ->
+        y += rowH;
+        addRenderableWidget(Button.builder(Component.literal("攻击生物名单  ›"), b ->
                 Minecraft.getInstance().setScreen(new WardMobTargetsScreen(this, be)))
-                .bounds(left, y, BTN_W, CONTROL_H)
-                .tooltip(Tooltip.create(Component.literal("只影响坐标对应的这一根火把")))
-                .build());
+                .bounds(lx, y, controlW, controlH).build());
 
-        // ---- 右列：目标发光 / 目标减速 / 击杀播报 / 传送掉落物 / 传送经验 ----
-        int ry = top;
-        addRenderableWidget(Button.builder(onOffText(glowing), b -> {
-            glowing = !glowing;
-            b.setMessage(onOffText(glowing));
-        }).bounds(right, ry, BTN_W, CONTROL_H).build());
-        ry += ROW_H;
-
-        addRenderableWidget(Button.builder(onOffText(slow), b -> {
-            slow = !slow;
-            b.setMessage(onOffText(slow));
-        }).bounds(right, ry, BTN_W, 20).build());
-        ry += ROW_H;
-
-        addRenderableWidget(Button.builder(onOffText(announce), b -> {
-            announce = !announce;
-            b.setMessage(onOffText(announce));
-        }).bounds(right, ry, BTN_W, 20).build());
-        ry += ROW_H;
-
-        addRenderableWidget(Button.builder(onOffText(dropTeleport), b -> {
-            dropTeleport = !dropTeleport;
-            b.setMessage(onOffText(dropTeleport));
-        }).bounds(right, ry, BTN_W, 20).build());
-        ry += ROW_H;
-
-        addRenderableWidget(Button.builder(onOffText(xpTeleport), b -> {
-            xpTeleport = !xpTeleport;
-            b.setMessage(onOffText(xpTeleport));
-        }).bounds(right, ry, BTN_W, 20).build());
-        ry += ROW_H;
-
-        // 忽略命名生物（白名单）—— 本火把独立设置
-        addRenderableWidget(Button.builder(onOffText(ignoreNamed), b -> {
-            ignoreNamed = !ignoreNamed;
-            b.setMessage(onOffText(ignoreNamed));
-        }).bounds(right, ry, BTN_W, 20)
-                .tooltip(Tooltip.create(Component.literal(
-                        "开 = 被命名的生物不会受伤\n只影响这一只火把")))
-                .build());
-        ry += ROW_H;
-
-        addRenderableWidget(Button.builder(Component.literal("攻击附魔"), b ->
+        // 右列七项；窄屏时放到第二组列位置，避免两列挤压
+        int rx = (columns == 2 ? rightColumnX : contentX) + labelW + 8;
+        int ry = rowsTop;
+        addToggle(rx, ry, glowing, v -> glowing = v); ry += rowH;
+        addToggle(rx, ry, slow, v -> slow = v); ry += rowH;
+        addToggle(rx, ry, announce, v -> announce = v); ry += rowH;
+        addToggle(rx, ry, dropTeleport, v -> dropTeleport = v); ry += rowH;
+        addToggle(rx, ry, xpTeleport, v -> xpTeleport = v); ry += rowH;
+        addToggle(rx, ry, ignoreNamed, v -> ignoreNamed = v); ry += rowH;
+        addRenderableWidget(Button.builder(Component.literal("攻击附魔  ›"), b ->
                 Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments())))
-                .bounds(right, ry, BTN_W, 20)
-                .tooltip(Tooltip.create(Component.literal("为当前这根放置火把配置独立攻击附魔；可添加多种附魔并设置等级")))
-                .build());
-        ry += ROW_H;
+                .bounds(rx, ry, controlW, controlH).build());
 
-        // ---- 底部按钮区（两行三列，居中）----
-        int bw = bottomButtonW;
-        int gap = layoutGap;
-        int totalW = bw * 3 + gap * 2;
-        int bx0 = cx - totalW / 2;
-        int by1 = top + ROW_H * 7 + GuiLayout.px(16, width, height, 8);
-        int by2 = by1 + GuiLayout.px(24, width, height, 12);
-
-        // 第一行：显示范围 / 显示设置 / 保存
-        addRenderableWidget(Button.builder(showRangeText(), b -> {
-            showRange = !showRange;
-            b.setMessage(showRangeText());
-            updateOverlay();
-        }).bounds(bx0, by1, bw, CONTROL_H).build());
-
-        addRenderableWidget(Button.builder(Component.literal("显示设置"), b -> {
-            DisplaySettingsScreen.loadFrom(be);
-            Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
-        }).bounds(bx0 + bw + gap, by1, bw, CONTROL_H).build());
-
+        int footerY = height - 25;
+        int footerW = Math.max(54, Math.min(88, (contentW - 8) / 2));
+        int footerGap = 8;
+        int footerX = contentX + (contentW - footerW * 2 - footerGap) / 2;
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
-                .bounds(bx0 + (bw + gap) * 2, by1, bw, CONTROL_H).build());
-
-        // 第二行：星环设置 / 全局设置 / 取消
-        addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
-            RingSettingsScreen.loadFrom(be);
-            Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
-        }).bounds(bx0, by2, bw, CONTROL_H).build());
-
-        addRenderableWidget(Button.builder(Component.literal("全局设置"), b ->
-                Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this)))
-                .bounds(bx0 + bw + gap, by2, bw, CONTROL_H)
-                .tooltip(Tooltip.create(Component.literal(
-                        "全局配置：忽略命名生物、传送、播报、副手火把等")))
-                .build());
-
+                .bounds(footerX, footerY, footerW, 20).build());
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
-                .bounds(bx0 + (bw + gap) * 2, by2, bw, CONTROL_H).build());
-
-        this._left = left;
-        this._right = right;
-        this._top = top;
+                .bounds(footerX + footerW + footerGap, footerY, footerW, 20).build());
     }
 
-    private int _left;
-    private int _right;
-    private int _top;
+    private void addToggle(int x, int y, boolean initial, java.util.function.Consumer<Boolean> setter) {
+        Button button = Button.builder(onOffText(initial), b -> {
+            boolean next = !initial;
+            setter.accept(next);
+            b.setMessage(onOffText(next));
+            // 更新捕获值，避免下一次点击重复切换同一状态
+            b.active = true;
+        }).bounds(x, y, controlW, controlH).build();
+        addRenderableWidget(button);
+    }
 
     private Component toggleText(String name, boolean on) {
         return Component.literal(name + ": " + (on ? "开" : "关"));
@@ -397,39 +347,37 @@ public class WardConfigScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
-        GuiLayout.drawFrame(gg, this.width, this.height);
+        GuiLayout.drawFrame(gg, width, height);
+
+        // 与 O 键菜单相同的导航栏、工作区和行卡片结构
+        gg.fill(12, 40, 12 + sideW, height - 12, 0xC9101B2B);
+        gg.fill(contentX - 2, 40, width - 12, height - 12, 0x66121F32);
+        gg.renderOutline(12, 40, sideW, height - 52, 0xFF263F60);
+        gg.renderOutline(contentX - 2, 40, width - contentX - 10, height - 52, 0xFF263F60);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        int panelTop = Math.max(34, _top - 18);
-        int panelBottom = Math.min(height - 34, _top + ROW_H * 7 + CONTROL_H * 2 + GuiLayout.px(28, width, height, 16));
-        int panelLeft = Math.max(6, _left - LABEL_W - GuiLayout.px(8, width, height, 4));
-        int panelRight = Math.min(width - 6, _right + BTN_W + GuiLayout.px(8, width, height, 4));
-        int mid = (_left + _right + BTN_W) / 2;
-        gg.fill(panelLeft, panelTop, mid - layoutGap, panelBottom, 0xD9101B2B);
-        gg.fill(mid + layoutGap, panelTop, panelRight, panelBottom, 0xD9101B2B);
-        gg.fill(panelLeft, panelTop, mid - layoutGap, panelTop + GuiLayout.px(3, width, height, 2), GuiLayout.ACCENT);
-        gg.fill(mid + layoutGap, panelTop, panelRight, panelTop + GuiLayout.px(3, width, height, 2), GuiLayout.ACCENT);
-        gg.renderOutline(panelLeft, panelTop, mid - layoutGap - panelLeft, panelBottom - panelTop, GuiLayout.BORDER);
-        gg.renderOutline(mid + layoutGap, panelTop, panelRight - mid - layoutGap, panelBottom - panelTop, GuiLayout.BORDER);
-        GuiLayout.drawTitle(gg, this.font, this.width, Math.max(8, panelTop - 20), "火把参数设置", "当前放置火把 · 独立配置");
-        gg.drawString(this.font,
-                "坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
-                _left, _top - 10, GuiLayout.MUTED);
+        gg.fill(16, 29, 82, 31, GuiLayout.ACCENT);
+        gg.drawString(font, "守卫火把", 16, 12, 0xFF70AEFF, false);
+        gg.drawString(font, "放置火把 · 参数设置", contentX + 8, 12, GuiLayout.TEXT, false);
+        gg.drawString(font, "坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
+                contentX + 8, 27, GuiLayout.MUTED, false);
 
-        // 左列标签
         String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔", "攻击生物"};
+        String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物", "攻击附魔"};
+        int colW = columns == 2 ? (contentW - columnGap) / 2 : contentW;
         for (int i = 0; i < leftLabels.length; i++) {
-            int y = _top + i * ROW_H;
-            gg.fill(_left - LABEL_W - 3, y - 2, _left + BTN_W + 2, y + CONTROL_H + 2, 0x66304765);
-            gg.fill(_left - LABEL_W - 3, y - 2, _left - LABEL_W - 1, y + CONTROL_H + 2, GuiLayout.ACCENT);
-            gg.drawString(this.font, leftLabels[i], _left - LABEL_W, y + 5, GuiLayout.TEXT);
+            int y = rowsTop + i * rowH;
+            int x = leftColumnX;
+            gg.fill(x + 2, y - 3, x + colW - 2, y + controlH + 4, 0x99304765);
+            gg.fill(x + 2, y - 3, x + 4, y + controlH + 4, GuiLayout.ACCENT);
+            gg.drawString(font, leftLabels[i], x + 8, y + Math.max(2, (controlH - 8) / 2), GuiLayout.TEXT, false);
         }
-        String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物"};
+        int rightX = columns == 2 ? rightColumnX : contentX;
         for (int i = 0; i < rightLabels.length; i++) {
-            int y = _top + i * ROW_H;
-            gg.fill(_right - LABEL_W - 3, y - 2, _right + BTN_W + 2, y + CONTROL_H + 2, 0x66304765);
-            gg.fill(_right - LABEL_W - 3, y - 2, _right - LABEL_W - 1, y + CONTROL_H + 2, GuiLayout.ACCENT);
-            gg.drawString(this.font, rightLabels[i], _right - LABEL_W, y + 5, GuiLayout.TEXT);
+            int y = rowsTop + i * rowH;
+            gg.fill(rightX + 2, y - 3, rightX + colW - 2, y + controlH + 4, 0x99304765);
+            gg.fill(rightX + 2, y - 3, rightX + 4, y + controlH + 4, GuiLayout.ACCENT);
+            gg.drawString(font, rightLabels[i], rightX + 8, y + Math.max(2, (controlH - 8) / 2), GuiLayout.TEXT, false);
         }
     }
 
