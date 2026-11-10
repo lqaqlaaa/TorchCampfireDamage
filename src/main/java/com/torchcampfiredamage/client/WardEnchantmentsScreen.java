@@ -28,6 +28,7 @@ public final class WardEnchantmentsScreen extends Screen {
     private EditBox search;
     private EditBox levelBox;
     private int page;
+    private final List<Button> rowButtons = new ArrayList<>();
 
     public WardEnchantmentsScreen(Screen parent, BlockPos pos, Map<ResourceLocation, Integer> current) {
         super(Component.literal("放置火把攻击附魔"));
@@ -56,7 +57,6 @@ public final class WardEnchantmentsScreen extends Screen {
         levelBox.setFilter(value -> value.isEmpty() || value.matches("[0-9]{1,10}"));
         levelBox.setHint(Component.literal("等级"));
         addRenderableWidget(levelBox);
-        rebuildRows();
         addRenderableWidget(Button.builder(Component.literal("上一页"), b -> { if (page > 0) { page--; rebuildRows(); } })
                 .bounds(width / 2 - 100, height - 30, 64, 20).build());
         addRenderableWidget(Button.builder(Component.literal("下一页"), b -> {
@@ -64,14 +64,12 @@ public final class WardEnchantmentsScreen extends Screen {
         }).bounds(width / 2 - 30, height - 30, 64, 20).build());
         addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
                 .bounds(width / 2 + 40, height - 30, 60, 20).build());
+        rebuildRows();
     }
 
     private void rebuildRows() {
-        // 仅移除附魔条目按钮，搜索框和底部导航保留。
-        clearWidgets();
-        if (search == null) return;
-        addRenderableWidget(search);
-        addRenderableWidget(levelBox);
+        for (Button button : rowButtons) removeWidget(button);
+        rowButtons.clear();
         List<ResourceLocation> ids = filtered();
         int panelWidth = Math.min(430, width - 16);
         int left = (width - panelWidth) / 2;
@@ -79,19 +77,11 @@ public final class WardEnchantmentsScreen extends Screen {
         for (int row = 0; row < ROWS && page * ROWS + row < ids.size(); row++) {
             ResourceLocation id = ids.get(page * ROWS + row);
             int y = top + row * 32;
-            addRenderableWidget(Button.builder(Component.literal("添加/更新"), b -> set(id))
-                    .bounds(left + panelWidth - 130, y, 64, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(id))
-                    .bounds(left + panelWidth - 62, y, 56, 20)
-                    .active(configured.containsKey(id)).build());
+            rowButtons.add(addRenderableWidget(Button.builder(Component.literal("添加/更新"), b -> set(id))
+                    .bounds(left + panelWidth - 130, y, 64, 20).build()));
+            rowButtons.add(addRenderableWidget(Button.builder(Component.literal("移除"), b -> remove(id))
+                    .bounds(left + panelWidth - 62, y, 56, 20).build()));
         }
-        addRenderableWidget(Button.builder(Component.literal("上一页"), b -> { if (page > 0) { page--; rebuildRows(); } })
-                .bounds(width / 2 - 100, height - 30, 64, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("下一页"), b -> {
-            if ((page + 1) * ROWS < filtered().size()) { page++; rebuildRows(); }
-        }).bounds(width / 2 - 30, height - 30, 64, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("返回"), b -> Minecraft.getInstance().setScreen(parent))
-                .bounds(width / 2 + 40, height - 30, 60, 20).build());
     }
 
     private int selectedLevel() {
