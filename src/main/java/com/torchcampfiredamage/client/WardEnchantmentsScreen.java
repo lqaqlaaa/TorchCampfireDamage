@@ -163,7 +163,8 @@ public final class WardEnchantmentsScreen extends Screen {
             return;
         }
         int count = 0;
-        for (Map.Entry<ResourceLocation, Integer> entry : candidates.entrySet()) {\n            if (configured.containsKey(entry.getKey())) continue;
+        for (Map.Entry<ResourceLocation, Integer> entry : candidates.entrySet()) {
+            if (configured.containsKey(entry.getKey())) continue;
             ResourceLocation id = entry.getKey();
             int level = Math.max(1, entry.getValue());
             configured.put(id, level);
