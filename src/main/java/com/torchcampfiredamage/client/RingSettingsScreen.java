@@ -369,6 +369,7 @@ public class RingSettingsScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         renderBackground(gg, mouseX, mouseY, partialTick);
+        GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
 
         // 标题 + 页码
