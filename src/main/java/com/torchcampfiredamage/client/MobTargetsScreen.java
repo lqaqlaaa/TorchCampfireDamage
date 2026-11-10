@@ -230,7 +230,10 @@ public final class MobTargetsScreen extends Screen {
                 graphics.fill(left, y - 10, left + listWidth, y - 9, 0xFF777777);
                 graphics.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
             }
+            // 预览区域严格限制在本行内；巨型实体即使模型超出默认尺寸，也不会覆盖相邻条目。
+            graphics.enableScissor(left + 2, y + 8, left + 34, y + 34);
             renderPreview(graphics, id, left + 18, y + 22);
+            graphics.disableScissor();
             graphics.drawString(font, font.plainSubstrByWidth(name + " · " + state, listWidth - 154),
                     left + 38, y + 14, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             graphics.drawString(font, entry.entityId(), left + 38, y + 23, 0x888888);
