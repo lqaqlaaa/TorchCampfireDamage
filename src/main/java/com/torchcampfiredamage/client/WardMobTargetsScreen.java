@@ -207,9 +207,6 @@ public class WardMobTargetsScreen extends Screen {
         for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             int y = 58 + row * 44;
-            if (mouseX >= left + 4 && mouseX <= left + 32 && mouseY >= y + 16 && mouseY <= y + 42) {
-                hoveredEntry = entry;
-            }
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
             String label = font.plainSubstrByWidth(entry.name() + " · " + state, panelWidth - 122);
@@ -219,14 +216,17 @@ public class WardMobTargetsScreen extends Screen {
                 gg.fill(left, y + 13, left + panelWidth, y + 14, 0xFF777777);
                 gg.drawString(font, group, left + 4, y + 3, 0xFFFFD700);
             }
-            // 裁剪模型预览，防止末影龙、巨人等大型模型绘制到其他条目上。
+            // 不透明列表卡片，避免世界背景透过模型和文字。
+            gg.fill(left, y + 14, left + panelWidth, y + 43, 0xFF172438);
+            gg.fill(left, y + 14, left + 2, y + 43, GuiLayout.ACCENT);
+            gg.renderOutline(left, y + 14, panelWidth, 29, GuiLayout.BORDER);
             gg.enableScissor(left + 4, y + 16, left + 32, y + 42);
             renderPreview(gg, entry.id(), left + 18, y + 38);
             gg.disableScissor();
             gg.drawString(font, label, left + 38, y + 23, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             gg.drawString(font, entry.id().toString(), left + 38, y + 33, 0x888888);
         }
-        if (hoveredEntry != null) renderHoverPreview(gg, hoveredEntry, mouseX, mouseY);
+        // 点击头像打开独立模型查看器。
     }
 
     private void renderHoverPreview(GuiGraphics graphics, MobEntry entry, int mouseX, int mouseY) {
@@ -278,6 +278,23 @@ public class WardMobTargetsScreen extends Screen {
                         graphics, x - 9, y - 9, x + 9, y + 9, 12, 0.0F, 0.0F, 0.0F, preview);
             } catch (Throwable ignored) { }
         }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            int panelWidth = Math.min(390, this.width - 20);
+            int panelLeft = (this.width - panelWidth) / 2;
+            List<MobEntry> entries = filteredEntries();
+            for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
+                int y = 58 + row * 44;
+                if (mouseX >= panelLeft + 4 && mouseX <= panelLeft + 34 && mouseY >= y + 14 && mouseY <= y + 43) {
+                    Minecraft.getInstance().setScreen(new MobModelPreviewScreen(this, entries.get(row + scroll).id()));
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
