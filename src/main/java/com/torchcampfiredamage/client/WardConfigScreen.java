@@ -79,7 +79,7 @@ public class WardConfigScreen extends Screen {
 
     private static final String[] SETTING_LABELS = {
             "开关", "范围类型", "伤害范围", "伤害", "伤害间隔", "攻击生物",
-            "目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物", "攻击附魔"
+            "目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物"
     };
 
     @Override
@@ -110,7 +110,7 @@ public class WardConfigScreen extends Screen {
         rightColumnX = contentX + (columns == 2 ? colW + columnGap : 0);
         clearWidgets();
 
-        String[] nav = {"参数设置", "生物列表", "攻击附魔", "显示设置", "星环设置", "全局设置"};
+        String[] nav = {"参数设置", "生物列表", "添加附魔", "显示设置", "星环设置", "全局设置"};
         int navY = 46;
         int navGap = 3;
         int navH = Math.max(15, Math.min(23, (height - 78 - navGap * 5) / 6));
@@ -188,9 +188,6 @@ public class WardConfigScreen extends Screen {
             case 9 -> addToggle(x, y, () -> dropTeleport, v -> dropTeleport = v);
             case 10 -> addToggle(x, y, () -> xpTeleport, v -> xpTeleport = v);
             case 11 -> addToggle(x, y, () -> ignoreNamed, v -> ignoreNamed = v);
-            case 12 -> addRenderableWidget(Button.builder(Component.literal("管理攻击附魔 ›"),
-                    b -> Minecraft.getInstance().setScreen(new WardEnchantmentsScreen(this, pos, be.getAttackEnchantments())))
-                    .bounds(x, y, controlW, controlH).build());
         }
     }
 
