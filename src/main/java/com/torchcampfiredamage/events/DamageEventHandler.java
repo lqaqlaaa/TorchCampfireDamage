@@ -6,6 +6,7 @@ import com.torchcampfiredamage.config.ModConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -235,7 +236,12 @@ public class DamageEventHandler {
         java.util.List<Mob> candidates = level.getEntitiesOfClass(Mob.class, area);
 
         for (Mob mob : candidates) {
-            if (!mob.isAlive() || damagedThisTick.contains(mob.getUUID())) continue;
+            if (!mob.isAlive()) continue;
+            // 生物发现记录属于服务端范围扫描，不依赖玩家打开名单界面；
+            // 必须在命名保护、目标过滤和造成伤害之前记录，避免低血量生物被瞬间击杀后漏记。
+            ResourceLocation discoveredId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+            if (discoveredId != null) ward.discoverMobTarget(discoveredId, isHostileToPlayers(mob));
+            if (damagedThisTick.contains(mob.getUUID())) continue;
             if (ignoreNamed && mob.hasCustomName()) continue;
             // 只有明确添加到本火把名单中的类型才覆盖默认行为。
             // 未配置的生物继续使用旧版敌对/仇恨判定，避免添加一个目标后误伤默认规则。
