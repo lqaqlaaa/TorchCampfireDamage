@@ -23,12 +23,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -315,27 +309,20 @@ public class DamageEventHandler {
 
             if (tpDrops || tpXp) {
                 UUID id = mob.getUUID();
-                int lootingLevel = ward.getAttackEnchantments().entrySet().stream()
-                        .filter(entry -> entry.getKey().toString().equals("minecraft:looting"))
-                        .mapToInt(Map.Entry::getValue).max().orElse(0);
                 entityDropTargets.put(id, new DropTarget(center, tpDrops, tpXp, Math.max(0, lootingLevel)));
                 CONSUMED.remove(id);
                 pendingCleanup.put(id, gameTime);
             }
 
-            ItemStack enchantmentSource = buildEnchantmentSource(level, ward, owner);
-            float finalDamage = enchantmentSource.isEmpty()
-                    ? damage : EnchantmentHelper.modifyDamage(level, enchantmentSource, mob, src, damage);
-            boolean hurtOk = mob.hurt(src, finalDamage);
-            if (hurtOk && !enchantmentSource.isEmpty()) {
-                EnchantmentHelper.doPostAttackEffectsWithItemSource(level, mob, src, enchantmentSource);
-            }
-            if (!hurtOk) {
-                mob.invulnerableTime = 0;
-                float nh = mob.getHealth() - finalDamage;
-                mob.setHealth(Math.max(0.0f, nh));
-                if (mob.getHealth() <= 0.0f) {
-                    mob.die(src);
+            java.util.List<DamageSource> sources = buildDamageSources(level, ward);
+            if (ward.getSpecialDamageTypes().contains("burn")) mob.setSecondsOnFire(5);
+            float perTypeDamage = damage / Math.max(1, sources.size());
+            for (DamageSource source : sources) {
+                if (!mob.isAlive()) break;
+                if (!mob.hurt(source, perTypeDamage)) {
+                    mob.invulnerableTime = 0;
+                    mob.setHealth(Math.max(0.0f, mob.getHealth() - perTypeDamage));
+                    if (mob.getHealth() <= 0.0f) mob.die(source);
                 }
             }
 
@@ -356,26 +343,16 @@ public class DamageEventHandler {
     }
 
 
-    private static ItemStack buildEnchantmentSource(ServerLevel level, WardSourceBlockEntity ward, Player owner) {
-        if (ward.getAttackEnchantments().isEmpty()) return ItemStack.EMPTY;
-        // Use the owner's actual weapon item as the enchantment carrier. Some modded enchantments
-        // validate supported item tags during effect evaluation; a synthetic diamond sword
-        // silently disables enchantments that are valid on the player's real weapon.
-        ItemStack source = owner != null && !owner.getMainHandItem().isEmpty()
-                ? owner.getMainHandItem().copyWithCount(1)
-                : new ItemStack(Items.DIAMOND_SWORD);
-        ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
-        var registry = level.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
-        for (var entry : ward.getAttackEnchantments().entrySet()) {
-            var holder = registry.getHolder(entry.getKey());
-            if (holder.isPresent() && entry.getValue() > 0) {
-                enchantments.set(holder.get(), entry.getValue());
-            }
-        }
-        ItemEnchantments built = enchantments.toImmutable();
-        if (built.isEmpty()) return ItemStack.EMPTY;
-        source.set(DataComponents.ENCHANTMENTS, built);
-        return source;
+    private static java.util.List<DamageSource> buildDamageSources(ServerLevel level, WardSourceBlockEntity ward) {
+        java.util.Set<String> selected = ward.getSpecialDamageTypes();
+        java.util.List<DamageSource> sources = new java.util.ArrayList<>();
+        if (selected.isEmpty()) return java.util.List.of(level.damageSources().magic());
+        if (selected.contains("fire")) sources.add(level.damageSources().inFire());
+        if (selected.contains("burn")) sources.add(level.damageSources().onFire());
+        if (selected.contains("magic")) sources.add(level.damageSources().magic());
+        if (selected.contains("lightning")) sources.add(level.damageSources().lightningBolt());
+        if (selected.contains("wither")) sources.add(level.damageSources().wither());
+        return sources.isEmpty() ? java.util.List.of(level.damageSources().magic()) : sources;
     }
 
     /* ================= 清理 ================= */
