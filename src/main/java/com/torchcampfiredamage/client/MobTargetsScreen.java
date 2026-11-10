@@ -66,16 +66,20 @@ public final class MobTargetsScreen extends Screen {
                     .bounds(deleteX, y + 2, deleteW, 20).build());
         }
 
+        // 底部按钮按固定间距排列，避免刷新按钮与上一页按钮重叠。
+        int controlsWidth = 56 + 8 + 24 + 8 + 24 + 8 + 56;
+        int controlsLeft = (width - controlsWidth) / 2;
+        int controlsY = height - 52;
         addRenderableWidget(Button.builder(Component.literal("刷新"), b -> requestList())
-                .bounds(width / 2 - 92, height - 52, 56, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("返回"), b -> minecraft.setScreen(parent))
-                .bounds(width / 2 + 36, height - 52, 56, 20).build());
+                .bounds(controlsLeft, controlsY, 56, 20).build());
         addRenderableWidget(Button.builder(Component.literal("◀"), b -> {
             if (page > 0) { page--; init(); }
-        }).bounds(width / 2 - 64, height - 52, 24, 20).build());
+        }).bounds(controlsLeft + 64, controlsY, 24, 20).build());
         addRenderableWidget(Button.builder(Component.literal("▶"), b -> {
             if (page + 1 < pageCount()) { page++; init(); }
-        }).bounds(width / 2 + 8, height - 52, 24, 20).build());
+        }).bounds(controlsLeft + 96, controlsY, 24, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("返回"), b -> minecraft.setScreen(parent))
+                .bounds(controlsLeft + 128, controlsY, 56, 20).build());
     }
 
     private int pageCount() {
