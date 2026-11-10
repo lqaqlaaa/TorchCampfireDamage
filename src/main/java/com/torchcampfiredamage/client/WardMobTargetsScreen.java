@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** 单根方块火把攻击范围内的生物名单。 */
 public class WardMobTargetsScreen extends Screen {
-    private static final int ROWS = 8;
+    private int rowsPerPage;
     private final Screen parent;
     private final BlockPos pos;
     private final Map<ResourceLocation, Boolean> targets = new TreeMap<>();
@@ -133,15 +133,16 @@ public class WardMobTargetsScreen extends Screen {
         rowButtons.clear();
 
         List<MobEntry> entries = filteredEntries();
-        int maxScroll = Math.max(0, entries.size() - ROWS);
+        int maxScroll = Math.max(0, entries.size() - rowsPerPage);
         scroll = Math.max(0, Math.min(scroll, maxScroll));
         int panelWidth = Math.min(390, this.width - 20);
         int left = (this.width - panelWidth) / 2;
         int top = 58;
-        int rowHeight = 34;
-        for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
+        int rowHeight = 44;
+        rowsPerPage = Math.max(1, Math.min(7, (this.height - 112) / rowHeight));
+        for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
-            int y = top + row * rowHeight + 10;
+            int y = top + row * rowHeight + 18;
             int toggleX = left + panelWidth - 108;
             int resetX = left + panelWidth - 52;
             rowButtons.add(addRenderableWidget(Button.builder(
@@ -180,8 +181,8 @@ public class WardMobTargetsScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int max = Math.max(0, filteredEntries().size() - ROWS);
-        scroll = Math.max(0, Math.min(max, scroll - (int)Math.signum(scrollY) * 3));
+        int max = Math.max(0, filteredEntries().size() - rowsPerPage);
+        scroll = Math.max(0, Math.min(max, scroll - (int)Math.signum(scrollY) * 2));
         rebuildRows();
         return true;
     }
@@ -203,22 +204,22 @@ public class WardMobTargetsScreen extends Screen {
         }
         for (int row = 0; row < ROWS && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
-            int y = 58 + row * 34 + 10;
+            int y = 58 + row * 44;
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
             String label = font.plainSubstrByWidth(entry.name() + " · " + state, panelWidth - 122);
             String namespace = entry.id().getNamespace();
             if (row == 0 || !namespace.equals(entries.get(row + scroll - 1).id().getNamespace())) {
                 String group = namespace.equals("minecraft") ? "Minecraft 原版" : namespace;
-                gg.fill(left, y - 10, left + panelWidth, y - 9, 0xFF777777);
-                gg.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
+                gg.fill(left, y + 13, left + panelWidth, y + 14, 0xFF777777);
+                gg.drawString(font, group, left + 4, y + 3, 0xFFFFD700);
             }
             // 裁剪模型预览，防止末影龙、巨人等大型模型绘制到其他条目上。
-            gg.enableScissor(left + 2, y - 8, left + 34, y + 34);
-            renderPreview(gg, entry.id(), left + 18, y + 32);
+            gg.enableScissor(left + 4, y + 16, left + 32, y + 42);
+            renderPreview(gg, entry.id(), left + 18, y + 38);
             gg.disableScissor();
-            gg.drawString(font, label, left + 38, y + 4, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
-            gg.drawString(font, entry.id().toString(), left + 38, y + 13, 0x888888);
+            gg.drawString(font, label, left + 38, y + 23, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
+            gg.drawString(font, entry.id().toString(), left + 38, y + 33, 0x888888);
         }
     }
 
@@ -236,7 +237,7 @@ public class WardMobTargetsScreen extends Screen {
             try {
                 preview.setNoAi(true);
                 InventoryScreen.renderEntityInInventoryFollowsAngle(
-                        graphics, x - 10, y - 22, x + 10, y + 2, 18, 0.0F, 0.0F, 0.0F, preview);
+                        graphics, x - 9, y - 9, x + 9, y + 9, 12, 0.0F, 0.0F, 0.0F, preview);
             } catch (Throwable ignored) { }
         }
     }
