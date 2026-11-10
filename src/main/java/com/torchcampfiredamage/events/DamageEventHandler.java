@@ -190,6 +190,10 @@ public class DamageEventHandler {
                 orderedRegions.add(new WardRegion(pos, ward, damageArea(pos, ward)));
             }
         }
+        // 使用写入方块实体 NBT 的放置序号，而不是区块加载顺序或 HashSet 顺序。
+        orderedRegions.sort(Comparator
+                .comparingLong((WardRegion region) -> region.ward().getPlacementOrder())
+                .thenComparing(region -> region.pos()));
         List<? extends Player> players = level.players();
 
         for (BlockPos ip : snapshot) {
