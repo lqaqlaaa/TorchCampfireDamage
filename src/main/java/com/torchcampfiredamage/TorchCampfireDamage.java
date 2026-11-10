@@ -5,7 +5,6 @@ import com.torchcampfiredamage.config.ModConfig;
 import com.torchcampfiredamage.events.DamageEventHandler;
 import com.torchcampfiredamage.events.InteractionHandler;
 import com.torchcampfiredamage.events.OffhandTorchHandler;
-import com.torchcampfiredamage.events.PlayerMobTargetHandler;
 import com.torchcampfiredamage.network.UpdateWardPayload;
 import com.torchcampfiredamage.network.UpdateOrbitPayload;
 import com.torchcampfiredamage.network.PlayerMobTargetsRequestPayload;
@@ -41,7 +40,6 @@ public class TorchCampfireDamage {
         NeoForge.EVENT_BUS.register(new DamageEventHandler());
         NeoForge.EVENT_BUS.register(new InteractionHandler());
         NeoForge.EVENT_BUS.register(new OffhandTorchHandler());
-        NeoForge.EVENT_BUS.register(new PlayerMobTargetHandler());
 
         // 网络包
         modEventBus.addListener(this::registerPayloads);
