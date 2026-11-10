@@ -75,7 +75,14 @@ public class OffhandTorchHandler {
             if (now - last < interval) continue;
             lastTime.put(sp.getUUID(), now);
 
-            float dmg = getAttackDamage(sp);
+            float dmg;
+            try {
+                dmg = ModConfig.OFFHAND_FIXED_DAMAGE_MODE.get()
+                        ? ModConfig.OFFHAND_FIXED_DAMAGE.get().floatValue()
+                        : getAttackDamage(sp);
+            } catch (Throwable t) {
+                dmg = getAttackDamage(sp);
+            }
 
             int cx = SectionPos.blockToSectionCoord(sp.getBlockX());
             int cz = SectionPos.blockToSectionCoord(sp.getBlockZ());
