@@ -93,7 +93,7 @@ public class OffhandTorchHandler {
                 slow = ModConfig.OFFHAND_SLOW.get();
                 tpDrops = ModConfig.OFFHAND_TELEPORT_DROPS.get();
                 tpXp = ModConfig.OFFHAND_TELEPORT_XP.get();
-                ignoreNamed = ModConfig.IGNORE_NAMED_MOBS.get();
+                ignoreNamed = ModConfig.OFFHAND_IGNORE_NAMED_MOBS.get();
             } catch (Throwable t) {
                 announce = false; glowing = false; slow = false;
                 tpDrops = false; tpXp = false; ignoreNamed = true;
