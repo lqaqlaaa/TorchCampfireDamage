@@ -282,11 +282,11 @@ public class GlobalSettingsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("◀"), b -> {
             if (page > 0) { page--; buildPage(); }
         }).bounds(footerX, footerY, smallW, 20).tooltip(Tooltip.create(Component.literal("上一页"))).build());
-        addRenderableWidget(Button.builder(Component.literal("恢复默认"), b -> {
+        addRenderableWidget(Button.builder(Component.literal("基础默认"), b -> {
             resetToDefaults();
             buildPage();
         }).bounds(footerX + smallW + footerGap, footerY, smallW, 20)
-                .tooltip(Tooltip.create(Component.literal("恢复全局配置默认值"))).build());
+                .tooltip(Tooltip.create(Component.literal("恢复通用规则中的默认值"))).build());
         addRenderableWidget(Button.builder(Component.literal("▶"), b -> {
             if (page + 1 < pageCount) { page++; buildPage(); }
         }).bounds(footerX + (smallW + footerGap) * 2, footerY, smallW, 20)
@@ -380,7 +380,6 @@ public class GlobalSettingsScreen extends Screen {
             gg.fill(baseX + 2, y - 3, baseX + colW - 2, y + 24, 0x553F3F3F);
             gg.drawString(font, rows.get(i).label(), baseX + 7, y + 6, 0xFFE6E6E6, false);
         }
-        gg.drawString(font, "配置会即时生效；返回时保存", contentX + 8, this.height - 38, 0xFFAAAAAA, false);
     }
 
     @Override
