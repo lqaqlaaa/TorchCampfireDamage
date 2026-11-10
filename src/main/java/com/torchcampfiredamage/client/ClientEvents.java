@@ -3,7 +3,6 @@ package com.torchcampfiredamage.client;
 import com.torchcampfiredamage.block.WardSourceBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import com.torchcampfiredamage.client.ModKeyMappings;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -13,51 +12,29 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
- * 客户端：右键守卫火把直接打开设置界面（不需要潜行）。
- * <p>
- * 注：潜行 + 右键的路径由服务端 InteractionHandler 拦截，
- * 这里处理普通右键（不潜行）的情况。
+ * 原版 Screen 入口：O 键打开全局设置，普通右键守卫火把打开该方块设置。
  */
 @EventBusSubscriber(modid = "torchcampfiredamage", value = Dist.CLIENT)
 public class ClientEvents {
-
-    private static boolean wasUsePressed = false;
-    private static boolean firstClientTickLogged;
-
-    static {
-        ClientDebugLog.info("ClientEvents class initialized; client event subscriber loaded.");
-    }
-
-    private static String screenName(net.minecraft.client.gui.screens.Screen screen) {
-        return screen == null ? "<none>" : screen.getClass().getName();
-    }
+    private static boolean wasUsePressed;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (!firstClientTickLogged) {
-            firstClientTickLogged = true;
-            ClientDebugLog.info("First ClientTickEvent.Post received; settings key registered="
-                    + (ModKeyMappings.OPEN_SETTINGS != null));
-        }
+
         if (ModKeyMappings.OPEN_SETTINGS.consumeClick()) {
-            ClientDebugLog.info("O/settings key consumed; playerPresent=" + (player != null)
-                    + ", levelPresent=" + (mc.level != null) + ", currentScreen=" + screenName(mc.screen));
             if (player != null && mc.level != null && mc.screen == null) {
-                ClientDebugLog.info("Opening minimal ImGui window test screen from O key.");
-                mc.setScreen(new ImGuiSettingsScreen(null));
-            } else {
-                ClientDebugLog.info("O key ignored because world/player is unavailable or another screen is open.");
+                mc.setScreen(new GlobalSettingsScreen(null));
             }
             return;
         }
+
         if (player == null || mc.level == null) {
             wasUsePressed = false;
             return;
         }
 
-        // 有界面打开时不处理
         if (mc.screen != null) {
             wasUsePressed = mc.options.keyUse.isDown();
             return;
@@ -66,13 +43,7 @@ public class ClientEvents {
         boolean pressed = mc.options.keyUse.isDown();
         boolean justPressed = pressed && !wasUsePressed;
         wasUsePressed = pressed;
-
-        if (!justPressed) {
-            return;
-        }
-
-        // 瞄准守卫方块
-        if (mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.BLOCK) {
+        if (!justPressed || mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.BLOCK) {
             return;
         }
 
