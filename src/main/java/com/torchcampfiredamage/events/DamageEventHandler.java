@@ -315,7 +315,7 @@ public class DamageEventHandler {
             }
 
             java.util.List<DamageSource> sources = buildDamageSources(level, ward);
-            if (ward.getSpecialDamageTypes().contains("burn")) mob.setSecondsOnFire(5);
+            if (ward.getSpecialDamageTypes().contains("burn")) mob.setRemainingFireTicks(Math.max(mob.getRemainingFireTicks(), 100));
             // 多选表示同一次火把攻击同时应用全部已选伤害方式；每种方式均使用完整配置伤害。
             // Minecraft 的 hurt 无敌帧会屏蔽同 tick 后续命中，因此每次伤害间重置无敌帧，
             // 不再把伤害拆分给不同类型。
