@@ -213,7 +213,7 @@ public class WardMobTargetsScreen extends Screen {
                 gg.fill(left, y - 10, left + panelWidth, y - 9, 0xFF777777);
                 gg.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
             }
-            renderPreview(gg, entry.id(), left + 18, y + 12);
+            renderPreview(gg, entry.id(), left + 18, y + 32);
             gg.drawString(font, label, left + 38, y + 4, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             gg.drawString(font, entry.id().toString(), left + 38, y + 13, 0x888888);
         }
