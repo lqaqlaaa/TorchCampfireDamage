@@ -41,10 +41,13 @@ public class WardConfigScreen extends Screen {
     private String intervalText;
 
     // 布局
-    private static final int ROW_H = 22;
-    private static final int LABEL_W = 76;
-    private static final int BOX_W = 88;
-    private static final int BTN_W = 78;
+    private int ROW_H = 22;
+    private int LABEL_W = 56;
+    private int BOX_W = 78;
+    private int BTN_W = 78;
+    private int CONTROL_H = 20;
+    private int bottomButtonW = 88;
+    private int layoutGap = 6;
 
     /** 最近一次打开的主界面所属方块，供子界面访问 */
     public static WardSourceBlockEntity lastBE;
@@ -72,11 +75,20 @@ public class WardConfigScreen extends Screen {
     @Override
     protected void init() {
         activeInstance = this;
+        float scale = GuiLayout.scale(this.width, this.height);
+        ROW_H = GuiLayout.px(22, width, height, 15);
+        LABEL_W = GuiLayout.px(56, width, height, 34);
+        BOX_W = GuiLayout.px(78, width, height, 58);
+        BTN_W = BOX_W;
+        CONTROL_H = GuiLayout.px(20, width, height, 14);
+        bottomButtonW = GuiLayout.px(88, width, height, 58);
+        layoutGap = GuiLayout.px(6, width, height, 3);
         int cx = this.width / 2;
-        int left = cx - 160;
-        int right = cx + 10;
+        int colGap = GuiLayout.px(24, width, height, 8);
+        int left = cx - colGap / 2 - BOX_W;
+        int right = cx + colGap / 2;
         // 内容总高约 6 行 + 2 行按钮
-        int contentH = ROW_H * 7 + 60;
+        int contentH = ROW_H * 7 + CONTROL_H * 2 + GuiLayout.px(24, width, height, 12);
         int top = Math.max(8, (this.height - contentH) / 2);
         int y = top;
 
@@ -85,7 +97,7 @@ public class WardConfigScreen extends Screen {
         addRenderableWidget(Button.builder(onOffText(enabled), b -> {
             enabled = !enabled;
             b.setMessage(onOffText(enabled));
-        }).bounds(left, y, BTN_W, 20).build());
+        }).bounds(left, y, BTN_W, CONTROL_H).build());
         y += ROW_H;
 
         // 范围类型
@@ -98,7 +110,7 @@ public class WardConfigScreen extends Screen {
         y += ROW_H;
 
         // 伤害范围（数值框）
-        rangeBox = new EditBox(this.font, left, y, BTN_W, 20, Component.literal("伤害范围"));
+        rangeBox = new EditBox(this.font, left, y, BTN_W, CONTROL_H, Component.literal("伤害范围"));
         rangeBox.setValue(rangeText);
         rangeBox.setResponder(t -> rangeText = t);
         rangeBox.setTooltip(Tooltip.create(Component.literal(
@@ -134,7 +146,7 @@ public class WardConfigScreen extends Screen {
         addRenderableWidget(Button.builder(onOffText(glowing), b -> {
             glowing = !glowing;
             b.setMessage(onOffText(glowing));
-        }).bounds(right, ry, BTN_W, 20).build());
+        }).bounds(right, ry, BTN_W, CONTROL_H).build());
         ry += ROW_H;
 
         addRenderableWidget(Button.builder(onOffText(slow), b -> {
@@ -179,8 +191,8 @@ public class WardConfigScreen extends Screen {
         ry += ROW_H;
 
         // ---- 底部按钮区（两行三列，居中）----
-        int bw = 88;      // 按钮宽
-        int gap = 6;      // 间距
+        int bw = bottomButtonW;
+        int gap = layoutGap
         int totalW = bw * 3 + gap * 2;
         int bx0 = cx - totalW / 2;
         int by1 = top + ROW_H * 7 + 16;
@@ -191,31 +203,31 @@ public class WardConfigScreen extends Screen {
             showRange = !showRange;
             b.setMessage(showRangeText());
             updateOverlay();
-        }).bounds(bx0, by1, bw, 20).build());
+        }).bounds(bx0, by1, bw, CONTROL_H).build());
 
         addRenderableWidget(Button.builder(Component.literal("显示设置"), b -> {
             DisplaySettingsScreen.loadFrom(be);
             Minecraft.getInstance().setScreen(new DisplaySettingsScreen(this));
-        }).bounds(bx0 + bw + gap, by1, bw, 20).build());
+        }).bounds(bx0 + bw + gap, by1, bw, CONTROL_H).build());
 
         addRenderableWidget(Button.builder(Component.literal("保存"), b -> save())
-                .bounds(bx0 + (bw + gap) * 2, by1, bw, 20).build());
+                .bounds(bx0 + (bw + gap) * 2, by1, bw, CONTROL_H).build());
 
         // 第二行：星环设置 / 全局设置 / 取消
         addRenderableWidget(Button.builder(Component.literal("星环设置"), b -> {
             RingSettingsScreen.loadFrom(be);
             Minecraft.getInstance().setScreen(new RingSettingsScreen(this));
-        }).bounds(bx0, by2, bw, 20).build());
+        }).bounds(bx0, by2, bw, CONTROL_H).build());
 
         addRenderableWidget(Button.builder(Component.literal("全局设置"), b ->
                 Minecraft.getInstance().setScreen(new GlobalSettingsScreen(this)))
-                .bounds(bx0 + bw + gap, by2, bw, 20)
+                .bounds(bx0 + bw + gap, by2, bw, CONTROL_H)
                 .tooltip(Tooltip.create(Component.literal(
                         "全局配置：忽略命名生物、传送、播报、副手火把等")))
                 .build());
 
         addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
-                .bounds(bx0 + (bw + gap) * 2, by2, bw, 20).build());
+                .bounds(bx0 + (bw + gap) * 2, by2, bw, CONTROL_H).build());
 
         this._left = left;
         this._right = right;
@@ -387,19 +399,19 @@ public class WardConfigScreen extends Screen {
         GuiLayout.drawFrame(gg, this.width, this.height);
         super.render(gg, mouseX, mouseY, partialTick);
 
-        gg.drawCenteredString(this.font, "守卫火源设置", this.width / 2, _top - 24, 0xFFD700);
+        GuiLayout.drawTitle(gg, this.font, this.width, Math.max(4, _top - 24), "火把参数设置", "当前放置火把 · 独立配置");
         gg.drawString(this.font,
                 "坐标: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(),
-                _left, _top - 10, 0xAAAAAA);
+                _left, _top - 10, GuiLayout.MUTED);
 
         // 左列标签
         String[] leftLabels = {"开关", "范围类型", "伤害范围", "伤害", "伤害间隔", "攻击生物"};
         for (int i = 0; i < leftLabels.length; i++) {
-            gg.drawString(this.font, leftLabels[i], _left - 56, _top + i * ROW_H + 6, 0xFFFFFF);
+            gg.drawString(this.font, leftLabels[i], _left - LABEL_W, _top + i * ROW_H + 5, GuiLayout.TEXT);
         }
         String[] rightLabels = {"目标发光", "目标减速", "击杀播报", "传送掉落物", "传送经验", "忽略命名生物"};
         for (int i = 0; i < rightLabels.length; i++) {
-            gg.drawString(this.font, rightLabels[i], _right - 56, _top + i * ROW_H + 6, 0xFFFFFF);
+            gg.drawString(this.font, rightLabels[i], _right - LABEL_W, _top + i * ROW_H + 5, GuiLayout.TEXT);
         }
     }
 
