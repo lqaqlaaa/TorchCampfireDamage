@@ -1,5 +1,7 @@
 package com.torchcampfiredamage.client;
 
+import net.minecraft.client.gui.GuiGraphics;
+
 /**
  * 界面自适应布局工具。
  * <p>
@@ -25,6 +27,14 @@ public final class GuiLayout {
     public static final int BASE_H = 240;
 
     private GuiLayout() {}
+
+    public static void drawFrame(GuiGraphics gg, int width, int height) {
+        gg.fill(5, 5, width - 5, height - 5, 0xD8101010);
+        gg.fill(7, 7, width - 7, 31, 0xFF292929);
+        gg.fill(8, 33, width - 8, height - 8, 0xE8202020);
+        gg.renderOutline(5, 5, width - 10, height - 10, 0xFF777777);
+        gg.renderOutline(8, 33, width - 16, height - 41, 0xFF555555);
+    }
 
     /**
      * 屏幕密度系数。
