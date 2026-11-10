@@ -53,7 +53,7 @@ import java.util.*;
  *  - CONSUMED 计数，两个事件都处理完才移除标记
  */
 public class DamageEventHandler {
-    private static final int SCAN_STEP = 2;
+    private static final int SCAN_STEP = 5;
     private static final int CHUNK_SIZE = SectionPos.SECTION_SIZE;
     private static final int CLEAN_PERIOD = 20;
 
@@ -171,8 +171,6 @@ public class DamageEventHandler {
         Set<BlockPos> torches = REGISTERED.get(level);
         if (torches == null || torches.isEmpty()) return;
 
-        if (gameTime % SCAN_STEP != 0) return;
-
         if (!DEBUG_PRINTED) {
             DEBUG_PRINTED = true;
             TorchCampfireDamage.LOGGER.info("[TorchCampfireDamage] indexed tick active, torches=" + torches.size());
@@ -192,6 +190,8 @@ public class DamageEventHandler {
                 continue;
             }
             if (!ward.isEnabled()) continue;
+            // 将不同位置的火把分散到不同 tick 扫描，避免大量火把在同一 tick 集中查询大范围实体。
+            if (Math.floorMod(gameTime + ip.hashCode(), SCAN_STEP) != 0) continue;
 
             Player nearest = null;
             double nearestSq = Double.MAX_VALUE;
