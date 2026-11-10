@@ -25,9 +25,10 @@ public record PlayerMobTargetsRequestPayload(int action, String entityId, boolea
     public static void handle(PlayerMobTargetsRequestPayload p, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player) || player.getServer()==null) return;
+            if (p.action() < 0 || p.action() > 4 || p.entityId() == null || p.entityId().length() > 256) return;
             PlayerMobTargetsData data=PlayerMobTargetsData.get(player.getServer());
             ResourceLocation id = p.action()==0 ? null : ResourceLocation.tryParse(p.entityId());
-            if (p.action()!=0 && id==null) return;
+            if (p.action()!=0 && (id==null || !net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.containsKey(id))) return;
             switch(p.action()) {
                 case 0 -> {}
                 case 1 -> data.setEnabled(player.getUUID(),id,p.enabled());
