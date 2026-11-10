@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -23,6 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.HashMap;
+import java.util.Comparator;
+import java.util.Locale;
+import net.minecraft.world.entity.Entity;
 
 /** 副手火把/护符的附近生物名单。 */
 public final class MobTargetsScreen extends Screen {
@@ -38,6 +43,7 @@ public final class MobTargetsScreen extends Screen {
     private int page;
     private int rowsPerPage;
     private boolean requestSent;
+    private final Map<ResourceLocation, Mob> previews = new HashMap<>();
 
     public MobTargetsScreen(Screen parent) {
         super(Component.literal("副手火把生物列表"));
@@ -47,7 +53,7 @@ public final class MobTargetsScreen extends Screen {
     @Override
     protected void init() {
         current = this;
-        rowsPerPage = Math.max(1, Math.min(8, (height - 112) / 28));
+        rowsPerPage = Math.max(1, Math.min(8, (height - 124) / 34));
         visible = scanNearby();
         int pageCount = pageCount();
         if (page >= pageCount) page = pageCount - 1;
@@ -55,14 +61,14 @@ public final class MobTargetsScreen extends Screen {
 
         int start = page * rowsPerPage;
         int end = Math.min(visible.size(), start + rowsPerPage);
-        int rowHeight = 26;
+        int rowHeight = 34;
         int listTop = 48;
         int left = Math.max(8, (width - Math.min(420, width - 16)) / 2);
         int listWidth = Math.min(420, width - 16);
 
         for (int i = start; i < end; i++) {
             PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
-            int y = listTop + (i - start) * rowHeight;
+            int y = listTop + (i - start) * rowHeight + 10;
             int right = left + listWidth;
             boolean configured = entry.configured();
             int toggleW = 54;
@@ -137,6 +143,7 @@ public final class MobTargetsScreen extends Screen {
         for (PlayerMobTargetsSyncPayload.Entry saved : targets) {
             if (result.stream().noneMatch(e -> e.entityId().equals(saved.entityId()))) result.add(saved);
         }
+        sortEntries(result);
         return result;
     }
 
@@ -210,16 +217,61 @@ public final class MobTargetsScreen extends Screen {
         for (int i = start; i < end; i++) {
             PlayerMobTargetsSyncPayload.Entry entry = visible.get(i);
             int y = listTop + (i - start) * rowHeight;
-            graphics.fill(left, y, left + listWidth, y + 24, 0x66333333);
+            graphics.fill(left, y + 10, left + listWidth, y + 34, 0x66333333);
             ResourceLocation id = ResourceLocation.tryParse(entry.entityId());
             String name = id == null ? entry.entityId()
                     : BuiltInRegistries.ENTITY_TYPE.getOptional(id)
                     .map(type -> type.getDescription().getString()).orElse(entry.entityId());
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
-            graphics.drawString(font, font.plainSubstrByWidth(name + " · " + state, listWidth - 120),
-                    left + 8, y + 7, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
-            graphics.drawString(font, entry.entityId(), left + 8, y + 16, 0x888888);
+            String namespace = id == null ? "unknown" : id.getNamespace();
+            if (i == start || !namespace.equals(namespaceOf(visible.get(i - 1).entityId()))) {
+                String group = namespace.equals("minecraft") ? "Minecraft 原版" : namespace;
+                graphics.fill(left, y - 10, left + listWidth, y - 9, 0xFF777777);
+                graphics.drawString(font, group, left + 4, y - 8, 0xFFFFD700);
+            }
+            renderPreview(graphics, id, left + 18, y + 22);
+            graphics.drawString(font, font.plainSubstrByWidth(name + " · " + state, listWidth - 154),
+                    left + 38, y + 14, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
+            graphics.drawString(font, entry.entityId(), left + 38, y + 23, 0x888888);
+        }
+    }
+
+
+    private String namespaceOf(String rawId) {
+        ResourceLocation id = ResourceLocation.tryParse(rawId);
+        return id == null ? "unknown" : id.getNamespace();
+    }
+
+    private String displayName(String rawId) {
+        ResourceLocation id = ResourceLocation.tryParse(rawId);
+        return id == null ? rawId : BuiltInRegistries.ENTITY_TYPE.getOptional(id)
+                .map(type -> type.getDescription().getString()).orElse(rawId);
+    }
+
+    private void sortEntries(List<PlayerMobTargetsSyncPayload.Entry> entries) {
+        entries.sort(Comparator
+                .comparingInt((PlayerMobTargetsSyncPayload.Entry e) -> namespaceOf(e.entityId()).equals("minecraft") ? 0 : 1)
+                .thenComparing(e -> namespaceOf(e.entityId()).toLowerCase(Locale.ROOT))
+                .thenComparing(e -> displayName(e.entityId()).toLowerCase(Locale.ROOT))
+                .thenComparing(PlayerMobTargetsSyncPayload.Entry::entityId));
+    }
+
+    private void renderPreview(GuiGraphics graphics, ResourceLocation id, int x, int y) {
+        Minecraft mc = Minecraft.getInstance();
+        if (id == null || mc.level == null) return;
+        Mob preview = previews.computeIfAbsent(id, key -> {
+            try {
+                return BuiltInRegistries.ENTITY_TYPE.getOptional(key)
+                        .map(type -> (Mob) type.create(mc.level)).orElse(null);
+            } catch (Throwable ignored) { return null; }
+        });
+        if (preview != null) {
+            try {
+                preview.setNoAi(true);
+                InventoryScreen.renderEntityInInventoryFollowsAngle(
+                        graphics, x - 10, y - 22, x + 10, y + 2, 18, 0.0F, 0.0F, 0.0F, preview);
+            } catch (Throwable ignored) { }
         }
     }
 
