@@ -142,7 +142,7 @@ public class OffhandTorchHandler {
 
                 if (!mob.isAlive() && announce) {
                     sp.sendSystemMessage(Component.literal(
-                            "§6[副手火把] §e" + mob.getName().getString() + "§7 被烧死了"));
+                            "§6[护符] §e" + mob.getName().getString() + "§7 被烧死了"));
                 }
             }
         }
