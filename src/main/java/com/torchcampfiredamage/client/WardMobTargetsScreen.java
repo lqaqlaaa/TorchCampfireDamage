@@ -203,9 +203,13 @@ public class WardMobTargetsScreen extends Screen {
             gg.drawCenteredString(font, "攻击范围内暂时没有生物，点击刷新重新扫描。",
                     width / 2, height / 2, 0xBBBBBB);
         }
+        MobEntry hoveredEntry = null;
         for (int row = 0; row < rowsPerPage && row + scroll < entries.size(); row++) {
             MobEntry entry = entries.get(row + scroll);
             int y = 58 + row * 44;
+            if (mouseX >= left + 4 && mouseX <= left + 32 && mouseY >= y + 16 && mouseY <= y + 42) {
+                hoveredEntry = entry;
+            }
             String state = entry.enabled() ? "开启" : "关闭";
             if (!entry.configured()) state += "（默认）";
             String label = font.plainSubstrByWidth(entry.name() + " · " + state, panelWidth - 122);
@@ -222,6 +226,30 @@ public class WardMobTargetsScreen extends Screen {
             gg.drawString(font, label, left + 38, y + 23, entry.enabled() ? 0xFFFFFF : 0xAAAAAA);
             gg.drawString(font, entry.id().toString(), left + 38, y + 33, 0x888888);
         }
+        if (hoveredEntry != null) renderHoverPreview(gg, hoveredEntry, mouseX, mouseY);
+    }
+
+    private void renderHoverPreview(GuiGraphics graphics, MobEntry entry, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        Mob preview = previews.computeIfAbsent(entry.id(), key -> {
+            try { return BuiltInRegistries.ENTITY_TYPE.getOptional(key).map(type -> (Mob) type.create(mc.level)).orElse(null); }
+            catch (Throwable ignored) { return null; }
+        });
+        if (preview == null) return;
+        int boxW = 116, boxH = 126;
+        int x = Math.max(4, Math.min(width - boxW - 4, mouseX + 14));
+        int y = Math.max(36, Math.min(height - boxH - 4, mouseY + 12));
+        graphics.fill(x, y, x + boxW, y + boxH, 0xF0101010);
+        graphics.renderOutline(x, y, boxW, boxH, 0xFFFFD700);
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(entry.name(), boxW - 8), x + boxW / 2, y + 6, 0xFFFFFF);
+        graphics.enableScissor(x + 4, y + 24, x + boxW - 4, y + boxH - 4);
+        try {
+            preview.setNoAi(true);
+            InventoryScreen.renderEntityInInventoryFollowsAngle(graphics, x + 8, y + 22, x + boxW - 8,
+                    y + boxH - 4, 48, 0.0F, 0.0F, 0.0F, preview);
+        } catch (Throwable ignored) { }
+        graphics.disableScissor();
     }
 
 
