@@ -21,6 +21,10 @@ import com.torchcampfiredamage.events.DamageEventHandler;
  */
 public class WardSourceBlockEntity extends BlockEntity {
 
+    private static long nextPlacementSequence;
+    /** 持久化的放置顺序，用于重叠攻击区域的稳定优先级。 */
+    private long placementOrder;
+
     private boolean enabled = true;
     /** true = 区块模式, false = 方块模式 */
     private boolean chunkMode = true;
@@ -146,6 +150,11 @@ public class WardSourceBlockEntity extends BlockEntity {
     public void setLevel(net.minecraft.world.level.Level level) {
         super.setLevel(level);
         if (level != null && !level.isClientSide) {
+            if (placementOrder <= 0) {
+                long tickBase = Math.max(1L, level.getGameTime()) * 1_000_000L;
+                placementOrder = tickBase + (++nextPlacementSequence % 1_000_000L);
+                setChanged();
+            }
             DamageEventHandler.register(level, getBlockPos());
         }
     }
@@ -159,6 +168,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     }
 
     /* ===== getter ===== */
+    public long getPlacementOrder() { return placementOrder; }
     public boolean isEnabled() { return enabled; }
     public boolean isChunkMode() { return chunkMode; }
     public int getChunkRadius() { return chunkRadius; }
@@ -382,6 +392,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
+        tag.putLong("placementOrder", placementOrder);
         tag.putBoolean("enabled", enabled);
         tag.putBoolean("chunkMode", chunkMode);
         tag.putInt("chunkRadius", chunkRadius);
@@ -451,6 +462,7 @@ public class WardSourceBlockEntity extends BlockEntity {
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
+        if (tag.contains("placementOrder")) placementOrder = Math.max(0L, tag.getLong("placementOrder"));
         if (tag.contains("enabled")) enabled = tag.getBoolean("enabled");
         if (tag.contains("chunkMode")) chunkMode = tag.getBoolean("chunkMode");
         if (tag.contains("chunkRadius")) chunkRadius = tag.getInt("chunkRadius");
