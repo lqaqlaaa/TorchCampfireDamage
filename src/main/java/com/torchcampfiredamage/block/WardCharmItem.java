@@ -54,8 +54,8 @@ public class WardCharmItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext ctx,
                                 List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.literal("§7手持时自动攻击周围敌对生物").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("§7放在副手或饰品栏即可生效").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.literal("§7装备在 Curios 饰品栏时自动攻击周围目标").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.literal("§7放在背包或手中不会触发效果").withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.literal("§8可与守卫火把互相合成").withStyle(ChatFormatting.DARK_GRAY));
         super.appendHoverText(stack, ctx, tooltip, flag);
     }
